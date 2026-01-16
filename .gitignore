@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.env
+.DS_Store
+*.egg-info/
+build/
+dist/
+outputs.h5
+src/mcdc_agent/scraped_docs
+src/mcdc_agent/corpus

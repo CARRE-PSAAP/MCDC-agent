@@ -1,0 +1,56 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcdc-agent"
+version = "0.1.0"
+description = "AI Agent for MC/DC Neutron Transport Simulation"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "BSD-3-Clause" }
+authors = [
+    { name = "Gunnar Larsen, Alex Mote, Lizhong Chen" }
+]
+keywords = ["AI", "Agent", "MCDC", "Neutron Transport"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: BSD License",
+]
+
+
+
+dependencies = [
+    "mcdc @ git+https://github.com/CEMeNT-PSAAP/MCDC.git@dev",
+    "langchain>=1.0.0",
+    "langchain-core>=1.0.0",
+    "langchain-chroma>=1.0.0",
+    "langchain-huggingface>=1.0.0",
+    "langchain-google-genai>=3.0.0",
+    "langchain-ollama>=0.3.0",
+    "langchain-community>=0.4.0",
+    "langchain-text-splitters>=1.0.0",
+    "chromadb>=1.0.0",
+    "sentence-transformers>=5.0.0",
+    "pandas",
+    "rich",
+    "prompt-toolkit",
+    "pypdf",
+    "beautifulsoup4",
+    "requests",
+    "python-dotenv",
+    "pydantic>=2.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/CARRE-PSAAP/MCDC-agent"
+Source = "https://github.com/CARRE-PSAAP/MCDC-agent"
+
+[project.scripts]
+mcdc-agent = "mcdc_agent.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/mcdc_agent"]
+
+[tool.hatch.metadata]
+allow-direct-references = true
