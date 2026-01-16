@@ -1,7 +1,7 @@
 # MCDC Agent
 
-> [!WARNING]
 > This agent is in testing. Generated scripts may require manual review.
+> Please let Gunnar on slack know if you have any issues
 
 An AI agent that guides you through building [MC/DC](https://github.com/CEMeNT-PSAAP/MCDC) neutron transport simulations. Uses Google Gemini to help you generate simulation input scripts. Currently does not support the various MCDC techniques like `population_control`, `branchless_collision()`, etc., they will be added in the future.
 
