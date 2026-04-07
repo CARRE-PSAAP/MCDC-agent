@@ -7,6 +7,7 @@ venv/
 *.egg-info/
 build/
 dist/
+results/
 outputs.h5
 src/mcdc_agent/scraped_docs
 src/mcdc_agent/corpus
