@@ -15,9 +15,9 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
 
-from mc_agent.core.utils import extract_response_text, extract_code
-from mc_agent.mcdc.tools.api_reference import APIReference
-from mc_agent.mcdc.tools.validator import DryRunValidator, ValidationStatus
+from mcdc_agent.mcdc.utils import extract_response_text, extract_code
+from mcdc_agent.mcdc.tools.api_reference import APIReference
+from mcdc_agent.mcdc.tools.validator import DryRunValidator, ValidationStatus
 
 from .shared import ERROR_HINTS
 from .small_model_prompts import (

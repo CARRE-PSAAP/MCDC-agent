@@ -18,17 +18,8 @@ def setup_logging(verbose: bool = False):
     logging.getLogger("chromadb").setLevel(logging.WARNING)
 
 
-def cmd_generate(args):
-    """Handle the 'generate' subcommand."""
-    # Import here to avoid slow startup for --help
-    from mcdc_agent.utils import load_llm
-    from mcdc_agent.onboarding.agent import MCDCAgent
-    from mcdc_agent.onboarding.decomposer import Decomposer
-    from rich.console import Console
-    
-    console = Console()
-    
-    # Get prompt from args or file
+def _load_prompt_text(args, console):
+    """Load the generation prompt from args or file."""
     if args.file:
         prompt_path = Path(args.file)
         if not prompt_path.exists():
@@ -36,46 +27,162 @@ def cmd_generate(args):
             sys.exit(1)
         prompt = prompt_path.read_text().strip()
         console.print(f"[dim]Loaded prompt from: {args.file}[/dim]")
-    elif args.prompt:
-        prompt = args.prompt
-    else:
-        console.print("[red]Error: Provide a prompt string or --file[/red]")
-        sys.exit(1)
+        return prompt
+
+    if args.prompt:
+        return args.prompt
+
+    console.print("[red]Error: Provide a prompt string or --file[/red]")
+    sys.exit(1)
+
+
+def _print_direct_trace(console, generator, script):
+    """Print direct-generator artifacts for demo/debug use."""
+    from rich.panel import Panel
+    from rich.syntax import Syntax
+
+    console.print(Panel(generator.last_mode or "unknown", title="Mode", border_style="cyan"))
+    if generator.last_plan:
+        console.print(Panel(
+            str(generator.last_plan),
+            title="General Plan",
+            border_style="magenta",
+        ))
+    if generator.last_geometry_plan:
+        console.print(Panel(
+            str(generator.last_geometry_plan),
+            title="Geometry Plan",
+            border_style="magenta",
+        ))
+    for phase in ["setup", "geometry", "finalize", "full"]:
+        if phase in generator.last_phase_scripts:
+            console.print(
+                Panel(
+                    Syntax(
+                        generator.last_phase_scripts[phase],
+                        "python",
+                        theme="monokai",
+                        line_numbers=False,
+                        word_wrap=True,
+                    ),
+                    title=f"{phase.title()} Output",
+                    border_style="green",
+                )
+            )
+    if script:
+        console.print(
+            Panel(
+                Syntax(script, "python", theme="monokai", line_numbers=True, word_wrap=True),
+                title="Final Script",
+                border_style="blue",
+            )
+        )
+
+
+def _cmd_generate_direct(args, prompt, console):
+    """Run the direct small-model generator backend."""
+    from mcdc_agent.mcdc.direct import build_direct_generator, save_generation_trace
+
+    if args.no_validate:
+        console.print("[yellow]Direct backend currently always performs final validation; ignoring --no-validate[/yellow]")
+
+    generator = build_direct_generator(
+        model=args.model,
+        provider=args.provider or "openrouter",
+        context_method=args.context_method,
+        generation_mode=args.generation_mode,
+        max_fix_attempts=args.max_fix_attempts,
+        temperature=0.1,
+    )
+
+    plan_only = args.plan_only or args.dry_run
+
+    if plan_only:
+        generator.generate(prompt, plan_only=True)
+        if args.trace_dir:
+            trace_path = save_generation_trace(
+                generator=generator,
+                prompt=prompt,
+                script=None,
+                output_dir=args.trace_dir,
+            )
+            console.print(f"[green]Trace saved to: {trace_path}[/green]")
+        if args.show_trace:
+            _print_direct_trace(console, generator, None)
+        return
+
+    script = generator.generate(prompt)
+    output_path = Path(args.output)
+    output_path.write_text(script)
+    console.print(f"\n[green]Script saved to: {args.output}[/green]")
+
+    if args.trace_dir:
+        trace_path = save_generation_trace(
+            generator=generator,
+            prompt=prompt,
+            script=script,
+            output_dir=args.trace_dir,
+        )
+        console.print(f"[green]Trace saved to: {trace_path}[/green]")
+
+    if args.show_trace:
+        _print_direct_trace(console, generator, script)
+
+
+def _cmd_generate_legacy(args, prompt, console):
+    """Run the existing decomposer + interactive agent generation backend."""
+    # Import here to avoid slow startup for --help
+    from mcdc_agent.utils import load_llm
+    from mcdc_agent.onboarding.agent import MCDCAgent
+    from mcdc_agent.onboarding.decomposer import Decomposer
+
+    # Initialize LLM with provided or default settings
+    llm = load_llm(
+        temperature=0.1,
+        model=args.model,
+        provider=args.provider
+    )
+
+    agent = MCDCAgent(llm)
+    decomposer = Decomposer(llm)
+
+    # Decompose prompt into steps
+    tasks = decomposer.decompose(prompt)
+    console.print(f"[cyan]Decomposed into {len(tasks)} steps[/cyan]")
+
+    if args.dry_run:
+        for i, task in enumerate(tasks, 1):
+            console.print(f"  {i}. [{task.step.upper()}] {task.instruction}")
+        console.print("\n[yellow]Dry run - no execution[/yellow]")
+        return
+
+    # Execute batch
+    result = agent.execute_batch(
+        [t.to_dict() for t in tasks],
+        enable_validation=not args.no_validate,
+        verbose=args.verbose
+    )
+
+    # Save result
+    output_path = Path(args.output)
+    output_path.write_text(result)
+    console.print(f"\n[green]Script saved to: {args.output}[/green]")
+
+
+def cmd_generate(args):
+    """Handle the 'generate' subcommand."""
+    from rich.console import Console
     
+    console = Console()
+    
+    prompt = _load_prompt_text(args, console)
     console.print(f"[dim]{prompt[:150]}{'...' if len(prompt) > 150 else ''}[/dim]\n")
     
     try:
-        # Initialize LLM with provided or default settings
-        llm = load_llm(
-            temperature=0.1,
-            model=args.model,
-            provider=args.provider
-        )
-        
-        agent = MCDCAgent(llm)
-        decomposer = Decomposer(llm)
-        
-        # Decompose prompt into steps
-        tasks = decomposer.decompose(prompt)
-        console.print(f"[cyan]Decomposed into {len(tasks)} steps[/cyan]")
-        
-        if args.dry_run:
-            for i, task in enumerate(tasks, 1):
-                console.print(f"  {i}. [{task.step.upper()}] {task.instruction}")
-            console.print("\n[yellow]Dry run - no execution[/yellow]")
-            return
-        
-        # Execute batch
-        result = agent.execute_batch(
-            [t.to_dict() for t in tasks],
-            enable_validation=not args.no_validate,
-            verbose=args.verbose
-        )
-        
-        # Save result
-        output_path = Path(args.output)
-        output_path.write_text(result)
-        console.print(f"\n[green]Script saved to: {args.output}[/green]")
+        if args.backend == "direct":
+            _cmd_generate_direct(args, prompt, console)
+        else:
+            _cmd_generate_legacy(args, prompt, console)
         
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -123,12 +230,14 @@ Examples:
   mcdc-agent generate "[Simulation description]"
   mcdc-agent generate --file prompt.txt -o my_script.py
   mcdc-agent generate "..." --provider ollama --model qwen3:8b
+  mcdc-agent generate --backend direct --provider openrouter --model anthropic/claude-opus-4.6 --file prompt.txt
   mcdc-agent interactive
 
 Environment Variables:
   LLM_PROVIDER    Set to 'ollama' or 'gemini' (default: gemini)
   OLLAMA_MODEL    Default model for Ollama (default: qwen3:8b)
   GEMINI_API_KEY  Required for Gemini provider
+  OPENROUTER_API_KEY  Required for OpenRouter direct generation
 """
     )
     
@@ -160,8 +269,13 @@ Environment Variables:
         help="Output filename (default: mcdc_input.py)"
     )
     gen_parser.add_argument(
+        "--backend", type=str, default="legacy",
+        choices=["legacy", "direct"],
+        help="Generation backend: existing decomposer/agent flow or direct small-model generator"
+    )
+    gen_parser.add_argument(
         "--provider", type=str, default=None,
-        help="LLM provider: 'gemini' or 'ollama'"
+        help="LLM provider: 'gemini', 'ollama', or 'openrouter' (direct backend)"
     )
     gen_parser.add_argument(
         "--model", type=str, default=None,
@@ -174,6 +288,32 @@ Environment Variables:
     gen_parser.add_argument(
         "--no-validate", action="store_true",
         help="Skip dry-run validation of generated script"
+    )
+    gen_parser.add_argument(
+        "--context-method", type=str, default="api_examples_plan_geom",
+        choices=["api_only", "api_examples", "api_examples_plan", "api_examples_plan_geom", "no_context"],
+        help="Direct backend only: context to include during generation"
+    )
+    gen_parser.add_argument(
+        "--generation-mode", type=str, default="phased",
+        choices=["phased", "full", "one_shot"],
+        help="Direct backend only: phased or one-shot generation"
+    )
+    gen_parser.add_argument(
+        "--max-fix-attempts", type=int, default=0,
+        help="Direct backend only: maximum automatic fix attempts"
+    )
+    gen_parser.add_argument(
+        "--plan-only", action="store_true",
+        help="Direct backend only: generate plans without creating a final script"
+    )
+    gen_parser.add_argument(
+        "--trace-dir", type=str, default=None,
+        help="Direct backend only: save prompt, plans, phase outputs, and final script to this directory"
+    )
+    gen_parser.add_argument(
+        "--show-trace", action="store_true",
+        help="Direct backend only: print plans and phase outputs to the console"
     )
     gen_parser.add_argument(
         "-v", "--verbose", action="store_true",
