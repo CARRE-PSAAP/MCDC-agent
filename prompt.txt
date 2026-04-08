@@ -1,0 +1,1 @@
+Create a simple slab simulation with 3 materials of different absorption cross sections with vacuum boundaries on each side. Tally flux and net current across the middle surface. Use 1000 particles, 2 batches, and a source across the entire slab.

@@ -5,19 +5,21 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
 
+from mcdc_agent.v2.config import AppConfig
 from mcdc_agent.v2.interactive import InteractiveGenerationSession
-from mcdc_agent.v2.mcdc import MCDCGeneratorV2
-from mcdc_agent.v2.types import GenerationArtifacts, GeneratorConfig
+from mcdc_agent.v2.services import GenerationService
+from mcdc_agent.v2.types import GenerationArtifacts
 
 
-def _build_config(args) -> GeneratorConfig:
-    return GeneratorConfig(
-        model=args.model,
+def _build_config(args) -> AppConfig:
+    return AppConfig(
         provider=args.provider or "openrouter",
+        model=args.model or AppConfig().model,
         context_method=getattr(args, "context_method", "api_examples_plan_geom"),
         generation_mode=getattr(args, "generation_mode", "phased"),
-        max_fix_attempts=getattr(args, "max_fix_attempts", 0),
+        max_fix_attempts=getattr(args, "max_fix_attempts", 3),
         temperature=0.1,
+        output_path=Path(args.output),
     )
 
 
@@ -73,19 +75,15 @@ def run_generate(args, prompt: str, console: Console) -> None:
     if args.no_validate:
         console.print("[yellow]The v2 backend currently always performs final validation; ignoring --no-validate[/yellow]")
 
-    generator = MCDCGeneratorV2(_build_config(args))
-    artifacts = generator.generate(
-        prompt,
-        plan_only=args.plan_only or args.dry_run,
-    )
+    service = GenerationService(_build_config(args))
+    artifacts = service.plan(prompt) if (args.plan_only or args.dry_run) else service.generate(prompt)
 
     if args.show_trace or args.plan_only or args.dry_run:
         _render_artifacts(console, artifacts)
 
     if artifacts.script:
-        output_path = Path(args.output)
-        output_path.write_text(artifacts.script)
-        console.print(f"\n[green]Script saved to: {args.output}[/green]")
+        output_path = service.save_script(artifacts.script)
+        console.print(f"\n[green]Script saved to: {output_path}[/green]")
 
 
 def run_interactive(args, console: Console) -> None:

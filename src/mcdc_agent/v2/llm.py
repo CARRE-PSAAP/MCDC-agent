@@ -20,6 +20,7 @@ class OpenRouterLLM:
         model: str,
         *,
         temperature: float = 0.3,
+        base_url: str = DEFAULT_OPENROUTER_BASE_URL,
         api_key: str | None = None,
         max_tokens: int = 40000,
         max_retries: int = 2,
