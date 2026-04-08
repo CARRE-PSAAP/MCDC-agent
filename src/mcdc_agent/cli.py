@@ -129,6 +129,13 @@ def _cmd_generate_direct(args, prompt, console):
         _print_direct_trace(console, generator, script)
 
 
+def _cmd_generate_v2(args, prompt, console):
+    """Run the new v2 generator backend."""
+    from mcdc_agent.v2.cli import run_generate
+
+    run_generate(args, prompt, console)
+
+
 def _cmd_generate_legacy(args, prompt, console):
     """Run the existing decomposer + interactive agent generation backend."""
     # Import here to avoid slow startup for --help
@@ -181,6 +188,8 @@ def cmd_generate(args):
     try:
         if args.backend == "direct":
             _cmd_generate_direct(args, prompt, console)
+        elif args.backend == "v2":
+            _cmd_generate_v2(args, prompt, console)
         else:
             _cmd_generate_legacy(args, prompt, console)
         
@@ -194,13 +203,20 @@ def cmd_generate(args):
 
 def cmd_interactive(args):
     """Handle the 'interactive' subcommand."""
-    from mcdc_agent.utils import load_llm
-    from mcdc_agent.onboarding.agent import MCDCAgent
     from rich.console import Console
     
     console = Console()
     
     try:
+        if args.backend == "v2":
+            from mcdc_agent.v2.cli import run_interactive
+
+            run_interactive(args, console)
+            return
+
+        from mcdc_agent.utils import load_llm
+        from mcdc_agent.onboarding.agent import MCDCAgent
+
         llm = load_llm(
             temperature=0.1,
             model=args.model,
@@ -231,6 +247,7 @@ Examples:
   mcdc-agent generate --file prompt.txt -o my_script.py
   mcdc-agent generate "..." --provider ollama --model qwen3:8b
   mcdc-agent generate --backend direct --provider openrouter --model anthropic/claude-opus-4.6 --file prompt.txt
+  mcdc-agent generate --backend v2 --provider openrouter --model anthropic/claude-opus-4.6 --file prompt.txt
   mcdc-agent interactive
 
 Environment Variables:
@@ -270,12 +287,12 @@ Environment Variables:
     )
     gen_parser.add_argument(
         "--backend", type=str, default="legacy",
-        choices=["legacy", "direct"],
-        help="Generation backend: existing decomposer/agent flow or direct small-model generator"
+        choices=["legacy", "direct", "v2"],
+        help="Generation backend: existing LangChain agent flow, direct generator, or the new v2 pipeline"
     )
     gen_parser.add_argument(
         "--provider", type=str, default=None,
-        help="LLM provider: 'gemini', 'ollama', or 'openrouter' (direct backend)"
+        help="LLM provider: legacy supports 'gemini'/'ollama'; direct and v2 use 'openrouter'"
     )
     gen_parser.add_argument(
         "--model", type=str, default=None,
@@ -292,20 +309,20 @@ Environment Variables:
     gen_parser.add_argument(
         "--context-method", type=str, default="api_examples_plan_geom",
         choices=["api_only", "api_examples", "api_examples_plan", "api_examples_plan_geom", "no_context"],
-        help="Direct backend only: context to include during generation"
+        help="Direct/v2 only: context to include during generation"
     )
     gen_parser.add_argument(
         "--generation-mode", type=str, default="phased",
         choices=["phased", "full", "one_shot"],
-        help="Direct backend only: phased or one-shot generation"
+        help="Direct/v2 only: phased or one-shot generation"
     )
     gen_parser.add_argument(
         "--max-fix-attempts", type=int, default=0,
-        help="Direct backend only: maximum automatic fix attempts"
+        help="Direct/v2 only: maximum automatic fix attempts"
     )
     gen_parser.add_argument(
         "--plan-only", action="store_true",
-        help="Direct backend only: generate plans without creating a final script"
+        help="Direct/v2 only: generate plans without creating a final script"
     )
     gen_parser.add_argument(
         "--trace-dir", type=str, default=None,
@@ -313,7 +330,7 @@ Environment Variables:
     )
     gen_parser.add_argument(
         "--show-trace", action="store_true",
-        help="Direct backend only: print plans and phase outputs to the console"
+        help="Direct/v2 only: print plans and phase outputs to the console"
     )
     gen_parser.add_argument(
         "-v", "--verbose", action="store_true",
@@ -327,12 +344,39 @@ Environment Variables:
         help="Start interactive onboarding mode"
     )
     int_parser.add_argument(
+        "--backend", type=str, default="legacy",
+        choices=["legacy", "v2"],
+        help="Interactive backend: legacy LangChain onboarding or the new v2 flow"
+    )
+    int_parser.add_argument(
         "--provider", type=str, default=None,
-        help="LLM provider: 'gemini' or 'ollama'"
+        help="LLM provider: legacy supports 'gemini'/'ollama'; v2 supports 'openrouter'"
     )
     int_parser.add_argument(
         "--model", type=str, default=None,
         help="Model name"
+    )
+    int_parser.add_argument(
+        "-f", "--file", type=str,
+        help="Optional prompt file to preload in v2 interactive mode"
+    )
+    int_parser.add_argument(
+        "-o", "--output", type=str, default="mcdc_input.py",
+        help="Output filename for v2 interactive generation (default: mcdc_input.py)"
+    )
+    int_parser.add_argument(
+        "--context-method", type=str, default="api_examples_plan_geom",
+        choices=["api_only", "api_examples", "api_examples_plan", "api_examples_plan_geom", "no_context"],
+        help="v2 only: context to include during generation"
+    )
+    int_parser.add_argument(
+        "--generation-mode", type=str, default="phased",
+        choices=["phased", "full", "one_shot"],
+        help="v2 only: phased or one-shot generation"
+    )
+    int_parser.add_argument(
+        "--max-fix-attempts", type=int, default=0,
+        help="v2 only: maximum automatic fix attempts"
     )
     int_parser.add_argument(
         "-v", "--verbose", action="store_true",
