@@ -12,6 +12,7 @@ from mcdc_agent.v2.services import (
     GenerationService,
     OnboardingService,
     QAService,
+    VisualizationService,
 )
 from mcdc_agent.v2.state import AppState
 from mcdc_agent.v2.types import ExecutionResult, GenerationArtifacts
@@ -30,6 +31,7 @@ class V2App:
         self.generation = GenerationService(config)
         self.execution = ExecutionService()
         self.diagnostics = DiagnosticsService()
+        self.visualization = VisualizationService(config)
 
         if config.output_path.exists():
             self.state.current_script = config.output_path.read_text(encoding="utf-8")
@@ -237,7 +239,7 @@ class V2App:
             if choice == "b" or not choice:
                 return
             if choice == "1":
-                self.console.print("[dim]Visualization is the next piece to wire in. The output summary above is ready for it.[/dim]")
+                self._visualize_output(output_h5, summary)
                 continue
             if choice == "2":
                 self.console.print("[dim]Diagnosis/analyze flow is the next piece to wire in. The output summary above is ready for it.[/dim]")
@@ -279,6 +281,31 @@ class V2App:
             self.console.print(Panel(result.stdout_display, title="Run Output", border_style="green"))
         if result.stderr.strip():
             self.console.print(Panel(result.stderr.strip(), title="Run Errors", border_style="red"))
+
+    def _visualize_output(self, output_h5: Path, summary: dict) -> None:
+        request = input("Visualization request (blank for a sensible default): ").strip()
+        try:
+            plot_path, spec = self.visualization.create_plot(
+                output_h5,
+                summary,
+                request=request,
+                script_text=self.state.current_script,
+            )
+            self.state.last_visualization_path = plot_path
+            spec_text = json.dumps(
+                {
+                    "kind": spec.kind,
+                    "tally": spec.tally,
+                    "score": spec.score,
+                    "value": spec.value,
+                    "title": spec.title,
+                },
+                indent=2,
+            )
+            self.console.print(Panel(spec_text, title="Visualization Spec", border_style="magenta"))
+            self.console.print(f"[green]Saved plot to: {plot_path}[/green]")
+        except Exception as exc:
+            self.console.print(f"[yellow]Visualization failed: {exc}[/yellow]")
 
     def _render_artifacts(self, artifacts: GenerationArtifacts) -> None:
         self.console.print(Panel(artifacts.mode or "unknown", title="Mode", border_style="cyan"))

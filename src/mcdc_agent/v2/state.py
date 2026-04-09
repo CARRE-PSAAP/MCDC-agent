@@ -19,3 +19,4 @@ class AppState:
     last_output_path: Path | None = None
     last_output_h5: Path | None = None
     last_output_summary: dict[str, Any] = field(default_factory=dict)
+    last_visualization_path: Path | None = None

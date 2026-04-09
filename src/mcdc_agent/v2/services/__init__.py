@@ -3,6 +3,7 @@ from .execution import ExecutionService
 from .generation import GenerationService
 from .onboarding import OnboardingService
 from .qa import QAHit, QAService
+from .visualization import VisualizationService
 
 __all__ = [
     "DiagnosticsService",
@@ -11,4 +12,5 @@ __all__ = [
     "OnboardingService",
     "QAHit",
     "QAService",
+    "VisualizationService",
 ]
