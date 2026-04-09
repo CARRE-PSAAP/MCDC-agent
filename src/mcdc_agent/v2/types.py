@@ -11,7 +11,7 @@ class GeneratorConfig:
     model: str | None = None
     provider: str = "openrouter"
     context_method: str = "api_examples_plan_geom"
-    generation_mode: str = "phased"
+    generation_mode: str = "auto"
     max_fix_attempts: int = 0
     temperature: float = 0.1
 

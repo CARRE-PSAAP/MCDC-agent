@@ -83,7 +83,10 @@ class ExecutionService:
         expected_output: Path,
     ) -> Path | None:
         if expected_output.exists():
-            return expected_output
+            previous_mtime = before.get(expected_output)
+            current_mtime = expected_output.stat().st_mtime
+            if previous_mtime is None or current_mtime > previous_mtime:
+                return expected_output
 
         candidates = []
         for path in run_dir.glob("*.h5"):

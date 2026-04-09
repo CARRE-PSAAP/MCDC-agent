@@ -16,7 +16,7 @@ def _build_config(args) -> AppConfig:
         provider=args.provider or "openrouter",
         model=args.model or AppConfig().model,
         context_method=getattr(args, "context_method", "api_examples_plan_geom"),
-        generation_mode=getattr(args, "generation_mode", "phased"),
+        generation_mode=getattr(args, "generation_mode", "auto"),
         max_fix_attempts=getattr(args, "max_fix_attempts", 3),
         temperature=0.1,
         output_path=Path(args.output),

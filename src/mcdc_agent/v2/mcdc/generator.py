@@ -9,22 +9,37 @@ class MCDCGeneratorV2:
     def __init__(self, config: GeneratorConfig):
         self.config = config
         self.llm = None
-        self.generator = None
+        self.generators = {}
 
-    def _get_generator(self) -> SmallModelGenerator:
-        if self.generator is None:
+    def _get_llm(self):
+        if self.llm is None:
             self.llm = load_llm(
                 temperature=self.config.temperature,
                 model=self.config.model,
                 provider=self.config.provider,
             )
-            self.generator = SmallModelGenerator(
-                self.llm,
+        return self.llm
+
+    def _get_generator(self, generation_mode: str | None = None) -> SmallModelGenerator:
+        mode = generation_mode or self.config.generation_mode
+        if mode == "auto":
+            mode = "phased"
+        if mode not in self.generators:
+            self.generators[mode] = SmallModelGenerator(
+                self._get_llm(),
                 max_fix_attempts=self.config.max_fix_attempts,
-                generation_mode=self.config.generation_mode,
+                generation_mode=mode,
                 context_method=self.config.context_method,
             )
-        return self.generator
+        return self.generators[mode]
+
+    def _select_generation_mode(self, prompt: str) -> str:
+        if self.config.generation_mode != "auto":
+            return self.config.generation_mode
+
+        detector = self._get_generator("phased")
+        complexity = detector._detect_complexity(prompt)
+        return "full" if complexity == "simple" else "phased"
 
     @staticmethod
     def _build_prompt(prompt: str, extra_context: str = "") -> str:
@@ -44,8 +59,9 @@ class MCDCGeneratorV2:
         plan_only: bool = False,
         extra_context: str = "",
     ) -> GenerationArtifacts:
-        generator = self._get_generator()
         effective_prompt = self._build_prompt(prompt, extra_context)
+        selected_mode = self._select_generation_mode(effective_prompt)
+        generator = self._get_generator(selected_mode)
         script = generator.generate(effective_prompt, plan_only=plan_only)
         return GenerationArtifacts(
             prompt=prompt,

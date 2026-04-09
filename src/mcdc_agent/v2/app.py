@@ -30,14 +30,11 @@ class V2App:
         self.qa = QAService(config)
         self.generation = GenerationService(config)
         self.execution = ExecutionService()
-        self.diagnostics = DiagnosticsService()
+        self.diagnostics = DiagnosticsService(config)
         self.visualization = VisualizationService(config)
 
-        if config.output_path.exists():
-            self.state.current_script = config.output_path.read_text(encoding="utf-8")
-
     def load_prompt_file(self, prompt_path: str | Path) -> None:
-        path = Path(prompt_path)
+        path = self._normalize_user_path(prompt_path)
         if not path.exists():
             raise FileNotFoundError(f"Prompt file not found: {prompt_path}")
         self.state.current_prompt = path.read_text(encoding="utf-8").strip()
@@ -133,6 +130,7 @@ class V2App:
         self.state.current_script = artifacts.script
         self.state.current_script_path = output_path
         self.state.last_output_path = output_path
+        self._clear_run_state()
         self.console.print(f"\n[green]Script saved to: {output_path}[/green]")
 
         result = self.execution.run_script(output_path)
@@ -153,10 +151,6 @@ class V2App:
 
     def _view_edit_script(self) -> None:
         self.console.print("\n[bold]View/Edit Current Script[/bold]")
-
-        if not self.state.current_script and self.config.output_path.exists():
-            self.state.current_script = self.config.output_path.read_text(encoding="utf-8")
-            self.state.current_script_path = self.config.output_path
 
         if self.state.current_script:
             self.console.print(
@@ -183,12 +177,13 @@ class V2App:
             path_text = input("File path: ").strip()
             if not path_text:
                 return
-            path = Path(path_text)
+            path = self._normalize_user_path(path_text)
             if not path.exists():
                 self.console.print(f"[yellow]File not found: {path}[/yellow]")
                 return
             self.state.current_script = path.read_text(encoding="utf-8")
             self.state.current_script_path = path
+            self._clear_run_state()
             self.console.print(f"[green]Loaded script from: {path}[/green]")
             return
         if choice == "p":
@@ -204,6 +199,7 @@ class V2App:
             path = self.state.current_script_path or self.config.output_path
             path.write_text(text, encoding="utf-8")
             self.state.current_script_path = path
+            self._clear_run_state()
             self.console.print(f"[green]Current script updated: {path}[/green]")
             return
 
@@ -255,10 +251,7 @@ class V2App:
     def _find_output_h5(self) -> Path | None:
         if self.state.last_output_h5 and self.state.last_output_h5.exists():
             return self.state.last_output_h5
-
-        search_dir = self.config.output_path.parent.resolve()
-        candidates = sorted(search_dir.glob("*.h5"), key=lambda path: path.stat().st_mtime, reverse=True)
-        return candidates[0] if candidates else None
+        return None
 
     def _print_execution(self, result: ExecutionResult) -> None:
         self.console.print(
@@ -320,6 +313,21 @@ class V2App:
             self.console.print(Panel(analysis, title="Analysis / Diagnosis", border_style="cyan"))
         except Exception as exc:
             self.console.print(f"[yellow]Analysis failed: {exc}[/yellow]")
+
+    def _clear_run_state(self) -> None:
+        self.state.last_run_returncode = None
+        self.state.last_run_stdout = ""
+        self.state.last_run_stderr = ""
+        self.state.last_output_h5 = None
+        self.state.last_output_summary = {}
+        self.state.last_visualization_path = None
+
+    @staticmethod
+    def _normalize_user_path(path_text: str | Path) -> Path:
+        text = str(path_text).strip()
+        if len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
+            text = text[1:-1]
+        return Path(text).expanduser().resolve()
 
     def _render_artifacts(self, artifacts: GenerationArtifacts) -> None:
         self.console.print(Panel(artifacts.mode or "unknown", title="Mode", border_style="cyan"))

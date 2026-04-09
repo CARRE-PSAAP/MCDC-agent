@@ -86,11 +86,13 @@ def _cmd_generate_direct(args, prompt, console):
     if args.no_validate:
         console.print("[yellow]Direct backend currently always performs final validation; ignoring --no-validate[/yellow]")
 
+    generation_mode = "phased" if args.generation_mode == "auto" else args.generation_mode
+
     generator = build_direct_generator(
         model=args.model,
         provider=args.provider or "openrouter",
         context_method=args.context_method,
-        generation_mode=args.generation_mode,
+        generation_mode=generation_mode,
         max_fix_attempts=args.max_fix_attempts,
         temperature=0.1,
     )
@@ -312,12 +314,12 @@ Environment Variables:
         help="Direct/v2 only: context to include during generation"
     )
     gen_parser.add_argument(
-        "--generation-mode", type=str, default="phased",
-        choices=["phased", "full", "one_shot"],
-        help="Direct/v2 only: phased or one-shot generation"
+        "--generation-mode", type=str, default="auto",
+        choices=["auto", "phased", "full", "one_shot"],
+        help="Direct/v2 only: auto (simple=one-shot, complex=phased), phased, or one-shot generation"
     )
     gen_parser.add_argument(
-        "--max-fix-attempts", type=int, default=0,
+        "--max-fix-attempts", type=int, default=3,
         help="Direct/v2 only: maximum automatic fix attempts"
     )
     gen_parser.add_argument(
@@ -370,12 +372,12 @@ Environment Variables:
         help="v2 only: context to include during generation"
     )
     int_parser.add_argument(
-        "--generation-mode", type=str, default="phased",
-        choices=["phased", "full", "one_shot"],
-        help="v2 only: phased or one-shot generation"
+        "--generation-mode", type=str, default="auto",
+        choices=["auto", "phased", "full", "one_shot"],
+        help="v2 only: auto (simple=one-shot, complex=phased), phased, or one-shot generation"
     )
     int_parser.add_argument(
-        "--max-fix-attempts", type=int, default=0,
+        "--max-fix-attempts", type=int, default=3,
         help="v2 only: maximum automatic fix attempts"
     )
     int_parser.add_argument(

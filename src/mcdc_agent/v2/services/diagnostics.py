@@ -136,19 +136,15 @@ class DiagnosticsService:
             "Status\nConfirmed findings\nLikely issues\nSuggested next steps\n"
         )
 
-        try:
-            llm = self._get_llm()
-            response = llm.invoke({"messages": [{"role": "user", "content": prompt}]})
-            if isinstance(response, dict):
-                text = str(response.get("content", "")).strip()
-            else:
-                text = str(response).strip()
-            if text:
-                return text
-        except Exception:
-            pass
-
-        return self._fallback_analysis(findings)
+        llm = self._get_llm()
+        response = llm.invoke({"messages": [{"role": "user", "content": prompt}]})
+        if isinstance(response, dict):
+            text = str(response.get("content", "")).strip()
+        else:
+            text = str(response).strip()
+        if not text:
+            raise RuntimeError("Diagnosis generation returned an empty response.")
+        return text
 
     def _summarize_settings(self, handle: h5py.File) -> dict[str, Any]:
         settings = {}
@@ -290,32 +286,6 @@ class DiagnosticsService:
             findings.append("The run output mentions a full particle bank, which suggests particle bank overflow.")
 
         return findings
-
-    @staticmethod
-    def _fallback_analysis(findings: list[str]) -> str:
-        lines = [
-            "Status",
-            "Fallback analysis generated without LLM assistance.",
-            "",
-            "Confirmed findings",
-        ]
-        if findings:
-            lines.extend(f"- {finding}" for finding in findings)
-        else:
-            lines.append("- No obvious deterministic issues detected.")
-        lines.extend(
-            [
-                "",
-                "Likely issues",
-                "- No additional LLM-based interpretation was available.",
-                "",
-                "Suggested next steps",
-                "- Review the output summary and run logs.",
-                "- Visualize the tallies to check whether the data matches the intended setup.",
-                "- If behavior still looks suspicious, inspect the source, tally, and settings sections of the script.",
-            ]
-        )
-        return "\n".join(lines)
 
     def _get_llm(self):
         if self._llm is None:

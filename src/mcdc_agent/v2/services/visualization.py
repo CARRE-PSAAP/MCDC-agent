@@ -53,8 +53,9 @@ class VisualizationService:
     ) -> VisualizationSpec:
         if request.strip():
             spec = self._plan_with_llm(summary, request=request, script_text=script_text)
-            if spec:
-                return spec
+            if not spec:
+                raise RuntimeError("Visualization planning failed; the model did not return a valid plot specification.")
+            return spec
         return self._fallback_spec(summary, request=request)
 
     def render_plot(

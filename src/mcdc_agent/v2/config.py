@@ -37,7 +37,7 @@ class AppConfig:
     provider: str = "openrouter"
     model: str = DEFAULT_OPENROUTER_MODEL
     context_method: str = "api_examples_plan_geom"
-    generation_mode: str = "phased"
+    generation_mode: str = "auto"
     max_fix_attempts: int = 3
     temperature: float = 0.1
     output_path: Path = field(default_factory=lambda: Path("mcdc_input.py"))
