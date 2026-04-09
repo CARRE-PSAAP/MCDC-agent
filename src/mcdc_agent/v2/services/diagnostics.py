@@ -3,9 +3,18 @@ from typing import Any
 
 import h5py
 
+from mcdc_agent.mcdc.tools.api_reference import APIReference
+from mcdc_agent.v2.config import AppConfig
+from mcdc_agent.v2.llm import load_llm
+
 
 class DiagnosticsService:
     """Deterministic parser and formatter for MCDC HDF5 output files."""
+
+    def __init__(self, config: AppConfig | None = None):
+        self.config = config or AppConfig()
+        self.api_reference = APIReference()
+        self._llm = None
 
     def summarize_output(self, output_h5: str | Path) -> dict[str, Any]:
         output_path = Path(output_h5).resolve()
@@ -87,6 +96,59 @@ class DiagnosticsService:
         if stderr.strip():
             parts.append("Run stderr:\n```text\n" + stderr.strip() + "\n```")
         return "\n\n".join(parts)
+
+    def analyze_output(
+        self,
+        summary: dict[str, Any],
+        *,
+        script_text: str = "",
+        stdout: str = "",
+        stderr: str = "",
+        user_question: str = "",
+    ) -> str:
+        findings = self._deterministic_findings(summary, stdout=stdout, stderr=stderr)
+        findings_text = "\n".join(f"- {finding}" for finding in findings) if findings else "- No obvious deterministic issues detected."
+
+        relevant_api = self.api_reference.get_relevant_sections(
+            "\n".join(filter(None, [user_question, stderr, stdout, script_text[:2000]]))
+        )
+        if not relevant_api.strip():
+            relevant_api = self.api_reference.get_full_text()[:12000]
+
+        context = self.build_analysis_context(
+            summary,
+            script_text=script_text,
+            stdout=stdout,
+            stderr=stderr,
+        )
+
+        prompt = (
+            "You are helping diagnose an MCDC simulation run.\n"
+            "Use the deterministic findings as primary evidence.\n"
+            "Use the script and API reference to identify likely issues in the setup.\n"
+            "Separate confirmed findings from suspected issues.\n"
+            "Be concise and practical.\n\n"
+            f"User question:\n{user_question or 'Does anything look wrong or noteworthy?'}\n\n"
+            f"Deterministic findings:\n{findings_text}\n\n"
+            f"Run/output context:\n{context}\n\n"
+            f"Relevant API reference:\n{relevant_api}\n\n"
+            "Return a short diagnosis with these headings:\n"
+            "Status\nConfirmed findings\nLikely issues\nSuggested next steps\n"
+        )
+
+        try:
+            llm = self._get_llm()
+            response = llm.invoke({"messages": [{"role": "user", "content": prompt}]})
+            if isinstance(response, dict):
+                text = str(response.get("content", "")).strip()
+            else:
+                text = str(response).strip()
+            if text:
+                return text
+        except Exception:
+            pass
+
+        return self._fallback_analysis(findings)
 
     def _summarize_settings(self, handle: h5py.File) -> dict[str, Any]:
         settings = {}
@@ -179,3 +241,87 @@ class DiagnosticsService:
                 return item.decode()
             return item
         return value
+
+    def _deterministic_findings(
+        self,
+        summary: dict[str, Any],
+        *,
+        stdout: str = "",
+        stderr: str = "",
+    ) -> list[str]:
+        findings: list[str] = []
+
+        if not summary.get("has_tallies"):
+            findings.append("No tally datasets were found in the output file.")
+
+        tallies = summary.get("tallies", [])
+        for tally in tallies:
+            if not tally.get("scores"):
+                findings.append(f"Tally {tally['name']} has no score datasets.")
+                continue
+            for score_name, score_info in tally["scores"].items():
+                shape = tuple(score_info.get("mean_shape", []))
+                findings.append(f"Tally {tally['name']} includes score {score_name} with mean shape {shape}.")
+
+        if summary.get("has_eigenvalue"):
+            eigen = summary.get("eigenvalue", {})
+            findings.append(
+                f"Eigenvalue data is present with k_mean={eigen.get('k_mean')} and k_sdev={eigen.get('k_sdev')}."
+            )
+        else:
+            findings.append("This output looks like a fixed-source run; no eigenvalue datasets are present.")
+
+        runtime = summary.get("runtime", {})
+        if runtime:
+            total = runtime.get("total")
+            simulation = runtime.get("simulation")
+            if isinstance(total, (int, float)) and isinstance(simulation, (int, float)) and total:
+                share = simulation / total
+                findings.append(f"Simulation time is {share:.1%} of total runtime.")
+
+        stderr_text = (stderr or "").strip()
+        if stderr_text:
+            findings.append("stderr is non-empty and may indicate warnings or runtime problems.")
+
+        stdout_text = (stdout or "").lower()
+        if "particle is lost" in stdout_text or "particle is lost" in stderr_text.lower():
+            findings.append("The run output mentions lost particles, which usually indicates a geometry gap or overlap.")
+        if "bank" in stdout_text and "full" in stdout_text:
+            findings.append("The run output mentions a full particle bank, which suggests particle bank overflow.")
+
+        return findings
+
+    @staticmethod
+    def _fallback_analysis(findings: list[str]) -> str:
+        lines = [
+            "Status",
+            "Fallback analysis generated without LLM assistance.",
+            "",
+            "Confirmed findings",
+        ]
+        if findings:
+            lines.extend(f"- {finding}" for finding in findings)
+        else:
+            lines.append("- No obvious deterministic issues detected.")
+        lines.extend(
+            [
+                "",
+                "Likely issues",
+                "- No additional LLM-based interpretation was available.",
+                "",
+                "Suggested next steps",
+                "- Review the output summary and run logs.",
+                "- Visualize the tallies to check whether the data matches the intended setup.",
+                "- If behavior still looks suspicious, inspect the source, tally, and settings sections of the script.",
+            ]
+        )
+        return "\n".join(lines)
+
+    def _get_llm(self):
+        if self._llm is None:
+            self._llm = load_llm(
+                temperature=self.config.temperature,
+                model=self.config.model,
+                provider=self.config.provider,
+            )
+        return self._llm

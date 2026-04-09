@@ -242,7 +242,7 @@ class V2App:
                 self._visualize_output(output_h5, summary)
                 continue
             if choice == "2":
-                self.console.print("[dim]Diagnosis/analyze flow is the next piece to wire in. The output summary above is ready for it.[/dim]")
+                self._analyze_output(summary)
                 continue
             self.console.print("[yellow]Invalid option.[/yellow]")
 
@@ -306,6 +306,20 @@ class V2App:
             self.console.print(f"[green]Saved plot to: {plot_path}[/green]")
         except Exception as exc:
             self.console.print(f"[yellow]Visualization failed: {exc}[/yellow]")
+
+    def _analyze_output(self, summary: dict) -> None:
+        question = input("Diagnosis question (blank for a general analysis): ").strip()
+        try:
+            analysis = self.diagnostics.analyze_output(
+                summary,
+                script_text=self.state.current_script,
+                stdout=self.state.last_run_stdout,
+                stderr=self.state.last_run_stderr,
+                user_question=question,
+            )
+            self.console.print(Panel(analysis, title="Analysis / Diagnosis", border_style="cyan"))
+        except Exception as exc:
+            self.console.print(f"[yellow]Analysis failed: {exc}[/yellow]")
 
     def _render_artifacts(self, artifacts: GenerationArtifacts) -> None:
         self.console.print(Panel(artifacts.mode or "unknown", title="Mode", border_style="cyan"))

@@ -19,6 +19,15 @@ mcdc.MaterialMG(
 # Example: mat = mcdc.MaterialMG(capture=np.array([0.15]), scatter=np.array([[0.05]]), fission=np.array([0.05]), nu_p=np.array([2.5]))
 ```
 
+### Material (Continuous Energy)
+```python
+mcdc.Material(
+    name: str = '',
+    nuclide_composition: dict[str, float],  # {'U235': 0.02, 'U238': 0.98}
+)
+
+```
+
 ---
 
 ## Surfaces
