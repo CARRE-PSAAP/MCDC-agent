@@ -14,7 +14,7 @@ CONCEPT_LESSONS = {
 # Fuel example
 fuel = mcdc.MaterialMG(
     capture=np.array([0.45]),    # Higher capture prevents runaway
-    fission=np.array([0.55]),    # Fission [/cm]
+    fission=np.array([0.55]),    # Fission
     nu_p=np.array([2.5])         # REQUIRED for fission materials
 )
 

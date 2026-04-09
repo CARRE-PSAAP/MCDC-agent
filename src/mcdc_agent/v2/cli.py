@@ -5,8 +5,8 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.syntax import Syntax
 
+from mcdc_agent.v2.app import V2App
 from mcdc_agent.v2.config import AppConfig
-from mcdc_agent.v2.interactive import InteractiveGenerationSession
 from mcdc_agent.v2.services import GenerationService
 from mcdc_agent.v2.types import GenerationArtifacts
 
@@ -87,116 +87,8 @@ def run_generate(args, prompt: str, console: Console) -> None:
 
 
 def run_interactive(args, console: Console) -> None:
-    session = InteractiveGenerationSession(_build_config(args))
-    prompt = ""
-    selected_materials: dict[str, str] = {}
-
+    app = V2App(_build_config(args), console=console)
     if getattr(args, "file", None):
-        prompt_path = Path(args.file)
-        if not prompt_path.exists():
-            raise FileNotFoundError(f"Prompt file not found: {args.file}")
-        prompt = prompt_path.read_text().strip()
+        app.load_prompt_file(args.file)
         console.print(f"[dim]Loaded prompt from: {args.file}[/dim]")
-
-    console.print("[bold cyan]MCDC Agent v2 Interactive[/bold cyan]")
-    console.print("Commands: prompt, load, material, use, clear, show, plan, generate, help, quit")
-
-    while True:
-        raw = input("v2> ").strip()
-        if not raw:
-            continue
-
-        command, _, argument = raw.partition(" ")
-        command = command.lower()
-        argument = argument.strip()
-
-        if command in {"quit", "exit", "q"}:
-            return
-
-        if command == "help":
-            console.print("prompt <text>      Set the current simulation prompt")
-            console.print("load <path>        Load the prompt from a text file")
-            console.print("material <query>   Look up material or isotope data")
-            console.print("use <query>        Add looked-up material data to generation context")
-            console.print("clear              Clear added material context")
-            console.print("show               Show the current prompt and added material context")
-            console.print("plan               Generate and show plans only")
-            console.print("generate           Generate the full script and save it")
-            console.print("quit               Exit interactive mode")
-            continue
-
-        if command == "prompt":
-            prompt = argument or input("Prompt: ").strip()
-            console.print("[green]Prompt updated.[/green]")
-            continue
-
-        if command == "load":
-            path_text = argument or input("Path: ").strip()
-            prompt_path = Path(path_text)
-            if not prompt_path.exists():
-                console.print(f"[red]File not found: {path_text}[/red]")
-                continue
-            prompt = prompt_path.read_text().strip()
-            console.print(f"[green]Loaded prompt from: {path_text}[/green]")
-            continue
-
-        if command == "material":
-            query = argument or input("Material query: ").strip()
-            context = session.lookup_material(query)
-            if context:
-                console.print(
-                    Panel(
-                        context,
-                        title=f"Material Lookup: {query}",
-                        border_style="yellow",
-                    )
-                )
-            else:
-                console.print(f"[yellow]No material data found for: {query}[/yellow]")
-            continue
-
-        if command == "use":
-            query = argument or input("Material query: ").strip()
-            context = session.lookup_material(query)
-            if context:
-                selected_materials[query] = context
-                console.print(f"[green]Added material context for: {query}[/green]")
-            else:
-                console.print(f"[yellow]No material data found for: {query}[/yellow]")
-            continue
-
-        if command == "clear":
-            selected_materials.clear()
-            console.print("[green]Cleared material context.[/green]")
-            continue
-
-        if command == "show":
-            prompt_text = prompt or "(no prompt set)"
-            console.print(Panel(prompt_text, title="Current Prompt", border_style="cyan"))
-            if selected_materials:
-                combined = "\n\n".join(selected_materials.values())
-                console.print(Panel(combined, title="Material Context", border_style="yellow"))
-            else:
-                console.print("[dim]No material context selected.[/dim]")
-            continue
-
-        if command in {"plan", "generate"}:
-            if not prompt:
-                console.print("[red]Set a prompt first with 'prompt' or 'load'.[/red]")
-                continue
-
-            extra_context = "\n\n".join(selected_materials.values())
-            if command == "plan":
-                artifacts = session.plan(prompt, extra_context=extra_context)
-                _render_artifacts(console, artifacts)
-                continue
-
-            artifacts = session.generate(prompt, extra_context=extra_context)
-            _render_artifacts(console, artifacts)
-            if artifacts.script:
-                output_path = Path(args.output)
-                output_path.write_text(artifacts.script)
-                console.print(f"\n[green]Script saved to: {args.output}[/green]")
-            continue
-
-        console.print(f"[yellow]Unknown command: {command}. Type 'help' for options.[/yellow]")
+    app.run()
