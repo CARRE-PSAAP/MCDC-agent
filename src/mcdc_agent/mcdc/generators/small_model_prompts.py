@@ -30,7 +30,7 @@ SHARED_SURFACE_RULES = '''## Valid Surface Types (ONLY these exist in mcdc)
 
 SHARED_MATERIAL_MODE_RULES = '''## Material Mode Rules
 - Default to single-group multigroup materials (`mcdc.MaterialMG`) unless the prompt explicitly asks for continuous-energy materials, named real materials, isotopic compositions, or CE nuclear-data usage.
-- If the prompt explicitly asks for continuous-energy materials, use `mcdc.Material(...)` with `nuclide_composition={...}`.
+- If the prompt explicitly asks for continuous-energy materials, use `mcdc.Material(...)` with `nuclide_composition={{...}}`.
 - When CE materials are requested and only a material name or formula is given, call the material lookup tool/service to obtain the `nuclide_composition` values instead of inventing them.
 - For CE materials, reuse the returned number densities exactly.
 - For CE problems, usually omit `energy_group` from `mcdc.Source(...)`.
