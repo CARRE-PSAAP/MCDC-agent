@@ -25,9 +25,30 @@ mcdc.Material(
     name: str = '',
     nuclide_composition: dict[str, float],  # {'U235': 0.02, 'U238': 0.98}
 )
-
+# DEFAULT: Prefer MaterialMG unless the prompt explicitly asks for continuous-energy materials,
+# named real materials, isotopic compositions, or use of the material lookup tool/service.
+#
+# When CE is requested:
+# 1. Call the material lookup tool/service with the material name (e.g. water, uranium_dioxide, boron_carbide).
+# 2. Use the returned `nuclide_composition={...}` values exactly.
+# 3. Do NOT invent or guess CE number densities by hand if the tool can provide them.
+#
+# Example CE snippets returned by the lookup service:
+# water = mcdc.Material(
+#     nuclide_composition={
+#         'H1': 6.700879e-02,
+#         'O16': 3.342818e-02,
+#     },
+# )
+#
+# uranium_dioxide = mcdc.Material(
+#     nuclide_composition={
+#         'U235': 1.687584e-04,
+#         'U238': 2.325563e-02,
+#         'O16': 4.673745e-02,
+#     },
+# )
 ```
-
 ---
 
 ## Surfaces
@@ -98,7 +119,7 @@ mcdc.Source(
     z: [zmin, zmax] = None,
     position: [x, y, z] = None,  # Point source (alternative to x,y,z)
     isotropic: bool = True,      # Isotropic emission
-    energy_group: int = 0,       # For MG problems
+    energy_group: int = 0,       # For MG problems only
     time: [tmin, tmax] = 0.0,    # Time range
     probability: float = 1.0,    # Relative probability
 )
@@ -107,6 +128,7 @@ mcdc.Source(
 # TIP: Use small source region unless volumetric source explicitly needed
 # IMPORTANT: DO NOT declare source at the boundary of the geometry, it will cause the simulation to fail
 # Always ensure the entire source region is inside the geometry
+# For CE problems, usually omit energy_group.
 ```
 
 ---

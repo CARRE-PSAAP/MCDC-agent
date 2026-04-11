@@ -24,7 +24,18 @@ mcdc.Material(
     name: str = '',
     nuclide_composition: dict[str, float],  # {'U235': 0.02, 'U238': 0.98}
 )
-# Use lookup_material tool to get correct nuclide compositions!
+# DEFAULT: Prefer MaterialMG unless the prompt explicitly asks for continuous-energy materials,
+# named real materials, isotopic compositions, or CE nuclear-data usage.
+#
+# When CE is requested, call the material lookup tool/service instead of inventing values.
+# Example:
+# lookup_material("water")
+# -> mcdc.Material(
+#        nuclide_composition={
+#            'H1': 6.700879e-02,
+#            'O16': 3.342818e-02,
+#        }
+#    )
 ```
 
 ---
@@ -88,12 +99,13 @@ mcdc.Source(
     z: [zmin, zmax] = None,
     position: [x, y, z] = None,  # Point source (alternative to x,y,z)
     isotropic: bool = True,      # Isotropic emission
-    energy_group: int = 0,       # For MG problems
+    energy_group: int = 0,       # For MG problems only
     time: [tmin, tmax] = 0.0,    # Time range
     probability: float = 1.0,    # Relative probability
 )
 # TIP: Use small source region unless volumetric source explicitly needed
 # Good default: x=[-0.1, 0.1] (point-like)
+# For CE problems, usually omit energy_group.
 ```
 
 ---

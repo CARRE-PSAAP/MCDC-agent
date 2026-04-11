@@ -28,6 +28,15 @@ SHARED_SURFACE_RULES = '''## Valid Surface Types (ONLY these exist in mcdc)
 - To represent a box/rectangular region: list its 6 bounding planes in `surfaces.boundary` or `surfaces.internal`.
   In the geometry phase the box region is built with CSG: `+x_lo & -x_hi & +y_lo & -y_hi & +z_lo & -z_hi`'''
 
+SHARED_MATERIAL_MODE_RULES = '''## Material Mode Rules
+- Default to single-group multigroup materials (`mcdc.MaterialMG`) unless the prompt explicitly asks for continuous-energy materials, named real materials, isotopic compositions, or CE nuclear-data usage.
+- If the prompt explicitly asks for continuous-energy materials, use `mcdc.Material(...)` with `nuclide_composition={...}`.
+- When CE materials are requested and only a material name or formula is given, call the material lookup tool/service to obtain the `nuclide_composition` values instead of inventing them.
+- For CE materials, reuse the returned number densities exactly.
+- For CE problems, usually omit `energy_group` from `mcdc.Source(...)`.
+- For MG problems, keep using `energy_group` and prefer single-group MaterialMG unless the prompt explicitly asks for multiple energy groups.
+'''
+
 # =============================================================================
 # COMPLEXITY CLASSIFICATION
 # =============================================================================
@@ -209,11 +218,13 @@ Return ONLY valid JSON matching this structure:
 11. Every source bullet must state its spatial location or host cell/region.
 12. Cell regions must describe real volumes only. Never use the same surface on both sides in one region expression.
 13. Use single-group multigroup materials unless the prompt explicitly asks for multiple energy groups.
-14. If you use multigroup materials and the prompt does NOT explicitly ask for eigenvalue, critical, or supercritical behavior, keep the system subcritical.
-15. For single-group multigroup material values, prefer `fission * nu_p < capture + scatter`.
-16. If the prompt DOES ask for eigenvalue or multiplying behavior, keep it only mildly multiplying unless stronger criticality is explicitly requested.
-17. Use `N_particle` around 1000 unless the prompt explicitly says otherwise.
-18. For eigenvalue runs, use `N_inactive=2` and `N_active=4` unless the prompt explicitly says otherwise.
+14. Use continuous-energy materials only when the prompt explicitly asks for CE, named real materials, isotopic composition, or use of the material lookup tool/service.
+15. If CE materials are requested and only material names/formulas are given, call the material lookup tool/service for `nuclide_composition` values instead of inventing them.
+16. If you use multigroup materials and the prompt does NOT explicitly ask for eigenvalue, critical, or supercritical behavior, keep the system subcritical.
+17. For single-group multigroup material values, prefer `fission * nu_p < capture + scatter`.
+18. If the prompt DOES ask for eigenvalue or multiplying behavior, keep it only mildly multiplying unless stronger criticality is explicitly requested.
+19. Use `N_particle` around 1000 unless the prompt explicitly says otherwise.
+20. For eigenvalue runs, use `N_inactive=2` and `N_active=4` unless the prompt explicitly says otherwise.
 '''
 
 COMPLEX_PLANNING_PROMPT = '''You are planning an MCDC Monte Carlo simulation with complex geometry.
@@ -605,6 +616,9 @@ CORRECT: define one shared `y10`, one shared `z10`, reuse everywhere.
 13. If one cell is a strict subregion of a larger region with the same fill, subtract the smaller from the larger.
 14. If dimensions are not specified, keep them symbolic with clear placeholder names.
 15. Never define a zero-thickness region with `+surface_a & -surface_b` when both have the same coordinate.
+16. Default to single-group multigroup materials unless the prompt explicitly asks for continuous-energy materials, named real materials, isotopic compositions, or CE nuclear-data usage.
+17. If CE materials are requested and only material names/formulas are given, call the material lookup tool/service for `nuclide_composition` values instead of inventing them.
+18. For MG problems, keep using `energy_group` in sources. For CE problems, usually omit `energy_group`.
 
 Return ONLY valid JSON matching this structure:
 {{
@@ -656,6 +670,8 @@ The following will be added in later phases:
 - Cylinders extend infinitely along axis - bound with planes if needed
 - Scatter cross-section must be 2D array: np.array([[value]]) for 1-group
 - Each surface on the same axis must have a DISTINCT coordinate value
+
+''' + SHARED_MATERIAL_MODE_RULES + '''
 
 {api_reference_section}
 {examples_section}
@@ -813,10 +829,13 @@ Use only short factual comments in the code.
   They are NOT assigned to settings
 - For translated universe copies, source and tally coordinates are GLOBAL coordinates
 - If geometry constants were already defined earlier, reuse them as-is
+- For CE problems, usually omit `energy_group` in `mcdc.Source(...)`
 - **Techniques are function calls, NOT settings attributes!**
   RIGHT: `mcdc.simulation.implicit_capture()`
 - **Rotation is 3 Euler angles in degrees**, NOT axis + angle:
   RIGHT: `rotation=[0, 5, 0]`  (5 degrees around Y axis)
+
+''' + SHARED_MATERIAL_MODE_RULES + '''
 
 {api_reference_section}
 {examples_section}
@@ -859,6 +878,8 @@ Use only short factual comments. If plan context is provided, follow it exactly.
 - scatter must be 2D: `np.array([[value]])` for 1-group
 - Fissile materials MUST have both `fission` AND `nu_p`
 - Use single-group multigroup materials unless the prompt explicitly asks for multiple energy groups
+- Use continuous-energy materials only when the prompt explicitly asks for CE, named real materials, isotopic composition, or use of the material lookup tool/service
+- If CE is requested and only material names/formulas are given, call the material lookup tool/service for `nuclide_composition`
 - Unless the prompt explicitly asks for critical, supercritical, or eigenvalue behavior, choose subcritical material values
 - For multigroup material values, prefer `fission * nu_p < capture + scatter` (subcritical)
 - Even when eigenmode is requested, avoid strongly supercritical material choices unless the prompt explicitly demands that. (barely critical)
@@ -881,6 +902,7 @@ Use only short factual comments. If plan context is provided, follow it exactly.
 
 ### Source, Tallies, Settings
 - Source x/y/z must be INSIDE geometry bounds, NOT on the boundary
+- For CE problems, usually omit `energy_group` in `mcdc.Source(...)`
 - TallyCell: `cell=<cell_object>`, NOT `cells=`
 - TallyMesh: `mesh=<mesh_object>`
 - Valid scores: 'flux', 'density', 'collision', 'fission', 'capture', 'net-current'
@@ -899,6 +921,8 @@ Use only short factual comments. If plan context is provided, follow it exactly.
   WRONG: `rotation=[0, 1, 0, 0.1]` (axis + angle)
   RIGHT: `rotation=[0, 5, 0]` (5 degrees around Y axis)
 - **Cell translation** is relative to the center of the filled universe
+
+''' + SHARED_MATERIAL_MODE_RULES + '''
 
 {api_reference_section}
 {examples_section}
@@ -945,6 +969,7 @@ FIX_PROMPT = '''## Fix Error in MCDC Script
 - Verify surface/cell variable names are defined before use
 - For "bank is full" errors, do NOT just add buffers. First check whether the material data is too multiplying (fission * nu_p > capture + scatter, it should be subcritical or barely critical if eigenmode is used or criticality was requested).
 - For multigroup material values, prefer `fission * nu_p < capture + scatter` unless the prompt explicitly asks for critical, supercritical, or eigenvalue behavior.
+- If the original prompt requested CE materials, preserve CE and use the material lookup tool/service for `nuclide_composition` values instead of converting the script back to MG.
 - If multiplying behavior is required, keep it only mildly multiplying (barely critical), use `mcdc.simulation.population_control(active=True)`, and consider `active_bank_buffer` if needed.
 - For eigenvalue runs, use `N_particle` around 1000 with `N_inactive=2` and `N_active=4` unless the prompt explicitly says otherwise.
 - For fixed-source runs, use `N_particle` around 1000 unless the prompt explicitly says otherwise.

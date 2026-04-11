@@ -21,18 +21,23 @@ import mcdc
 # Materials
 # =============================================================================
 
-# PATTERN: Fissile fuel — MUST have both fission AND nu_p
-fuel_mat = mcdc.MaterialMG(
-    capture=np.array([0.08]),
-    scatter=np.array([[0.25]]),
-    fission=np.array([0.12]),
-    nu_p=np.array([2.5]),
+# PATTERN: Continuous-energy fuel from the material lookup workflow
+fuel_mat = mcdc.Material(
+    name="uranium_dioxide",
+    nuclide_composition={
+        "U235": 1.687584e-04,
+        "U238": 2.325563e-02,
+        "O16": 4.673745e-02,
+    },
 )
 
-# PATTERN: Moderator (non-fissile) — scatter-dominated
-mod_mat = mcdc.MaterialMG(
-    capture=np.array([0.02]),
-    scatter=np.array([[0.9]]),
+# PATTERN: Continuous-energy moderator from the material lookup workflow
+mod_mat = mcdc.Material(
+    name="water",
+    nuclide_composition={
+        "H1": 6.700879e-02,
+        "O16": 3.342818e-02,
+    },
 )
 
 # =============================================================================
@@ -98,7 +103,6 @@ mcdc.Source(
     x=[-assembly_half, assembly_half],
     y=[-assembly_half, assembly_half],
     isotropic=True,
-    energy_group=0,
 )
 
 # =============================================================================

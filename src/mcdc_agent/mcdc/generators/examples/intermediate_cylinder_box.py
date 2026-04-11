@@ -19,16 +19,23 @@ import mcdc
 # Materials
 # =============================================================================
 
-# PATTERN: Strongly absorbing material
-absorber = mcdc.MaterialMG(
-    capture=np.array([2.0]),
-    scatter=np.array([[0.1]]),
+# PATTERN: Continuous-energy absorber from the material lookup workflow
+absorber = mcdc.Material(
+    name="boron_carbide",
+    nuclide_composition={
+        "B10": 2.191740e-02,
+        "B11": 8.822030e-02,
+        "C12": 2.723981e-02,
+    },
 )
 
-# PATTERN: Moderating/scattering material
-moderator = mcdc.MaterialMG(
-    capture=np.array([0.05]),
-    scatter=np.array([[0.85]]),
+# PATTERN: Continuous-energy moderator from the material lookup workflow
+moderator = mcdc.Material(
+    name="water",
+    nuclide_composition={
+        "H1": 6.700879e-02,
+        "O16": 3.342818e-02,
+    },
 )
 
 # =============================================================================
@@ -64,7 +71,6 @@ mcdc.Source(
     x=[-3.0, -2.0],
     y=[-3.0, -2.0],
     isotropic=True,
-    energy_group=0,
 )
 
 # =============================================================================
