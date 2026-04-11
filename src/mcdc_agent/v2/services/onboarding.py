@@ -29,7 +29,7 @@ class OnboardingService:
         return list(self.TOPICS)
 
     def get_topic(self, key_or_label: str) -> OnboardingTopic:
-        query = key_or_label.strip().lower()
+        query = str(key_or_label).strip().lower()
         for topic in self.TOPICS:
             if query in {topic.key.lower(), topic.label.lower(), topic.lesson_id.lower()}:
                 return topic
@@ -50,7 +50,7 @@ class OnboardingService:
 
     def format_lesson(self, key_or_label: str) -> str:
         lesson = self.get_lesson(key_or_label)
-        lines = [lesson["title"]]
+        lines = [f"# {lesson['title']}"]
 
         concept = str(lesson.get("concept", "")).strip()
         if concept:
@@ -58,16 +58,16 @@ class OnboardingService:
 
         syntax = str(lesson.get("syntax", "")).strip()
         if syntax:
-            lines.extend(["", "Syntax:", syntax])
+            lines.extend(["", "## Syntax", "```python", syntax, "```"])
 
         parts = str(lesson.get("parts", "")).strip()
         if parts:
-            lines.extend(["", "Parameters and Notes:", parts])
+            lines.extend(["", "## Parameters and Notes", parts])
 
         tips = lesson.get("tips", [])
         if tips:
             lines.append("")
-            lines.append("Tips:")
+            lines.append("## Tips")
             for tip in tips:
                 lines.append(f"- {tip}")
 

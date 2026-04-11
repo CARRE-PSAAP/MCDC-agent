@@ -2,6 +2,7 @@ import json
 from pathlib import Path
 
 from rich.console import Console
+from rich.markdown import Markdown
 from rich.panel import Panel
 from rich.syntax import Syntax
 
@@ -79,8 +80,26 @@ class V2App:
                 return
 
             try:
+                topic = self.onboarding.get_topic(choice)
                 lesson_text = self.onboarding.format_lesson(choice)
-                self.console.print(Panel(lesson_text, title="Lesson", border_style="magenta"))
+                self.console.print(
+                    Panel(
+                        Markdown(lesson_text, code_theme="monokai"),
+                        title=topic.label,
+                        border_style="magenta",
+                    )
+                )
+                self.console.print("[dim]Ask a question about this topic, or press Enter to go back.[/dim]")
+                while True:
+                    question = input("> ").strip()
+                    if not question:
+                        break
+                    scoped_question = f"In MCDC, regarding {topic.label}: {question}"
+                    try:
+                        answer = self.qa.answer(scoped_question, top_k=4)
+                        self.console.print(Panel(answer, title=f"{topic.label} Q&A", border_style="cyan"))
+                    except Exception as exc:
+                        self.console.print(f"[yellow]Could not generate an answer: {exc}[/yellow]")
             except KeyError:
                 self.console.print("[yellow]Unknown topic.[/yellow]")
 
