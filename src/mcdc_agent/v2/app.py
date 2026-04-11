@@ -154,24 +154,7 @@ class V2App:
         self.state.last_output_path = output_path
         self._clear_run_state()
         self.console.print(f"\n[green]Script saved to: {output_path}[/green]")
-
-        with self.console.status("[cyan]Running simulation...[/cyan]", spinner="dots"):
-            result = self.execution.run_script(output_path)
-        self._record_execution(result)
-        self._print_execution(result)
-
-        if result.output_h5:
-            try:
-                with self.console.status("[cyan]Summarizing output...[/cyan]", spinner="dots"):
-                    summary = self.diagnostics.summarize_output(result.output_h5)
-                self.state.last_output_summary = summary
-                self.console.print(Panel(
-                    self.diagnostics.format_summary(summary),
-                    title="Output Summary",
-                    border_style="blue",
-                ))
-            except Exception as exc:
-                self.console.print(f"[yellow]Run finished, but output summary failed: {exc}[/yellow]")
+        self._run_current_script()
 
     def _view_edit_script(self) -> None:
         self._section("View/Edit Current Script")
@@ -195,6 +178,7 @@ class V2App:
 
         self.console.print("  [l] Load from file", markup=False)
         self.console.print("  [p] Paste replacement", markup=False)
+        self.console.print("  [r] Run current script", markup=False)
         self.console.print("  [b] Back", markup=False)
         choice = self._prompt().lower()
         if choice == "b" or not choice:
@@ -212,6 +196,7 @@ class V2App:
             self.state.current_script_path = path
             self._clear_run_state()
             self.console.print(f"[green]Loaded script from: {path}[/green]")
+            self._prompt_to_run_current_script()
             return
         if choice == "p":
             self.console.print("[dim]Paste the new script below. End with a line containing only END.[/dim]")
@@ -228,6 +213,10 @@ class V2App:
             self.state.current_script_path = path
             self._clear_run_state()
             self.console.print(f"[green]Current script updated: {path}[/green]")
+            self._prompt_to_run_current_script()
+            return
+        if choice == "r":
+            self._run_current_script()
             return
 
         self.console.print("[yellow]Invalid option.[/yellow]")
@@ -235,14 +224,16 @@ class V2App:
     def _results_and_diagnostics(self) -> None:
         self._section("Results and Diagnostics")
         output_h5 = self._find_output_h5()
-        if not output_h5:
-            self.console.print("[yellow]No output .h5 file found yet.[/yellow]")
-            return
 
         try:
             with self.console.status("[cyan]Reading output...[/cyan]", spinner="dots"):
-                summary = self.diagnostics.summarize_output(output_h5)
-            self.state.last_output_h5 = output_h5
+                summary = self.diagnostics.summarize_run_context(
+                    output_h5=output_h5,
+                    returncode=self.state.last_run_returncode,
+                    stdout=self.state.last_run_stdout,
+                    stderr=self.state.last_run_stderr,
+                )
+            self.state.last_output_h5 = output_h5 if output_h5 and output_h5.exists() else None
             self.state.last_output_summary = summary
             self.console.print(
                 Panel(
@@ -263,6 +254,9 @@ class V2App:
             if choice == "b" or not choice:
                 return
             if choice == "1":
+                if not output_h5:
+                    self.console.print("[yellow]Visualization requires an output .h5 file. This run did not produce one.[/yellow]")
+                    continue
                 self._visualize_output(output_h5, summary)
                 continue
             if choice == "2":
@@ -342,7 +336,13 @@ class V2App:
                     stderr=self.state.last_run_stderr,
                     user_question=question,
                 )
+            self.state.last_analysis = analysis
             self.console.print(Panel(analysis, title="Analysis / Diagnosis", border_style="cyan"))
+            self.console.print("  [f] Apply suggested fix", markup=False)
+            self.console.print("  [b] Back", markup=False)
+            choice = self._prompt().lower()
+            if choice == "f":
+                self._apply_diagnostic_fix(summary, question, analysis)
         except Exception as exc:
             self.console.print(f"[yellow]Analysis failed: {exc}[/yellow]")
 
@@ -353,6 +353,7 @@ class V2App:
         self.state.last_output_h5 = None
         self.state.last_output_summary = {}
         self.state.last_visualization_path = None
+        self.state.last_analysis = ""
 
     @staticmethod
     def _normalize_user_path(path_text: str | Path) -> Path:
@@ -369,6 +370,83 @@ class V2App:
         self.console.rule(f"[bold cyan]{title}[/bold cyan]")
         if subtitle:
             self.console.print(f"[dim]{subtitle}[/dim]")
+
+    def _run_current_script(self) -> None:
+        if not self.state.current_script.strip():
+            self.console.print("[yellow]No current script is loaded.[/yellow]")
+            return
+        if not self.state.current_script_path:
+            self.console.print("[yellow]No current script file is available to run.[/yellow]")
+            return
+
+        with self.console.status("[cyan]Running simulation...[/cyan]", spinner="dots"):
+            result = self.execution.run_script(self.state.current_script_path)
+        self._record_execution(result)
+        self._print_execution(result)
+
+        if result.output_h5:
+            try:
+                with self.console.status("[cyan]Summarizing output...[/cyan]", spinner="dots"):
+                    summary = self.diagnostics.summarize_output(result.output_h5)
+                self.state.last_output_summary = summary
+                self.console.print(
+                    Panel(
+                        self.diagnostics.format_summary(summary),
+                        title="Output Summary",
+                        border_style="blue",
+                    )
+                )
+            except Exception as exc:
+                self.console.print(f"[yellow]Run finished, but output summary failed: {exc}[/yellow]")
+
+    def _prompt_to_run_current_script(self) -> None:
+        self.console.print("[dim]Run the current script now? [y/N][/dim]")
+        if self._prompt().lower() == "y":
+            self._run_current_script()
+
+    def _apply_diagnostic_fix(self, summary: dict, question: str, analysis: str) -> None:
+        if not self.state.current_script.strip():
+            self.console.print("[yellow]No current script is loaded, so there is nothing to fix.[/yellow]")
+            return
+
+        try:
+            with self.console.status("[cyan]Applying suggested fix...[/cyan]", spinner="dots"):
+                fixed_script = self.diagnostics.suggest_script_fix(
+                    summary,
+                    script_text=self.state.current_script,
+                    stdout=self.state.last_run_stdout,
+                    stderr=self.state.last_run_stderr,
+                    user_question=question,
+                    analysis_text=analysis,
+                    original_prompt=self.state.current_prompt,
+                )
+        except Exception as exc:
+            self.console.print(f"[yellow]Fix generation failed: {exc}[/yellow]")
+            return
+
+        path = self.state.current_script_path or self.config.output_path
+        path.write_text(fixed_script, encoding="utf-8")
+        self.state.current_script = fixed_script
+        self.state.current_script_path = path
+        self._clear_run_state()
+
+        self.console.print(
+            Panel(
+                Syntax(
+                    fixed_script,
+                    "python",
+                    theme="monokai",
+                    line_numbers=True,
+                    word_wrap=True,
+                ),
+                title="Updated Script",
+                border_style="green",
+            )
+        )
+        self.console.print(f"[green]Updated current script: {path}[/green]")
+        self.console.print("[dim]Run the updated script now? [y/N][/dim]")
+        if self._prompt().lower() == "y":
+            self._run_current_script()
 
     def _render_artifacts(self, artifacts: GenerationArtifacts) -> None:
         self.console.print(Panel(artifacts.mode or "unknown", title="Mode", border_style="cyan"))

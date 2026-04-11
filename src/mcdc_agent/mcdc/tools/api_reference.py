@@ -80,13 +80,15 @@ class APIReference:
         # Map keywords to sections in mcdc_api_reference.md
         keywords = {
             "surface": "Surfaces",
-            "cell": "Cells",
+            "cell": "Cells and Regions",
             "material": "Materials",
-            "source": "Sources",
+            "source": "Source",
             "tally": "Tallies",
             "setting": "Settings",
-            "lattice": "Lattices",
-            "universe": "Universes and Lattices",
+            "lattice": "Universe & Lattice",
+            "universe": "Universe & Lattice",
+            "region": "Cells and Regions",
+            "eigen": "Settings",
         }
         
         for kw, section_title in keywords.items():
