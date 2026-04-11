@@ -76,7 +76,9 @@ def run_generate(args, prompt: str, console: Console) -> None:
         console.print("[yellow]The v2 backend currently always performs final validation; ignoring --no-validate[/yellow]")
 
     service = GenerationService(_build_config(args))
-    artifacts = service.plan(prompt) if (args.plan_only or args.dry_run) else service.generate(prompt)
+    status_text = "[cyan]Planning...[/cyan]" if (args.plan_only or args.dry_run) else "[cyan]Generating script...[/cyan]"
+    with console.status(status_text, spinner="dots"):
+        artifacts = service.plan(prompt) if (args.plan_only or args.dry_run) else service.generate(prompt)
 
     if args.show_trace or args.plan_only or args.dry_run:
         _render_artifacts(console, artifacts)

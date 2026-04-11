@@ -41,16 +41,15 @@ class V2App:
         self.state.current_prompt = path.read_text(encoding="utf-8").strip()
 
     def run(self) -> None:
-        self.console.print("[bold cyan]MCDC Agent v2[/bold cyan]")
-        self.console.print("[dim]OpenRouter-backed generation, onboarding, Q&A, and diagnostics.[/dim]")
+        self._section("MCDC Agent v2", "OpenRouter-backed generation, onboarding, Q&A, and diagnostics.")
 
         while True:
-            self.console.print("\n[bold]Main Menu[/bold]")
+            self._section("Main Menu")
             for key, label in TOP_LEVEL_MENU:
                 self.console.print(f"  [{key}] {label}", markup=False)
             self.console.print("  [q] Quit", markup=False)
 
-            choice = input("Select option: ").strip().lower()
+            choice = self._prompt().lower()
             if choice == "q":
                 return
             if choice == "1":
@@ -68,12 +67,12 @@ class V2App:
 
     def _learn_menu(self) -> None:
         while True:
-            self.console.print("\n[bold]Learn MCDC[/bold]")
+            self._section("Learn MCDC")
             for key, label in self.onboarding.menu_options():
                 self.console.print(f"  [{key}] {label}", markup=False)
             self.console.print("  [b] Back", markup=False)
 
-            choice = input("Select topic: ").strip()
+            choice = self._prompt()
             if not choice:
                 continue
             if choice.lower() == "b":
@@ -91,12 +90,13 @@ class V2App:
                 )
                 self.console.print("[dim]Ask a question about this topic, or press Enter to go back.[/dim]")
                 while True:
-                    question = input("> ").strip()
+                    question = self._prompt()
                     if not question:
                         break
                     scoped_question = f"In MCDC, regarding {topic.label}: {question}"
                     try:
-                        answer = self.qa.answer(scoped_question, top_k=4)
+                        with self.console.status("[cyan]Thinking...[/cyan]", spinner="dots"):
+                            answer = self.qa.answer(scoped_question, top_k=4)
                         self.console.print(Panel(answer, title=f"{topic.label} Q&A", border_style="cyan"))
                     except Exception as exc:
                         self.console.print(f"[yellow]Could not generate an answer: {exc}[/yellow]")
@@ -104,11 +104,11 @@ class V2App:
                 self.console.print("[yellow]Unknown topic.[/yellow]")
 
     def _ask_questions(self) -> None:
-        self.console.print("\n[bold]Ask Questions[/bold]")
+        self._section("Ask Questions")
         self.console.print("[dim]Press Enter on an empty line to return.[/dim]")
 
         while True:
-            question = input("Question: ").strip()
+            question = self._prompt()
             if not question:
                 return
 
@@ -118,7 +118,8 @@ class V2App:
                 continue
 
             try:
-                answer = self.qa.answer(question, top_k=4)
+                with self.console.status("[cyan]Thinking...[/cyan]", spinner="dots"):
+                    answer = self.qa.answer(question, top_k=4)
                 self.console.print(Panel(answer, title="Answer", border_style="cyan"))
             except Exception as exc:
                 self.console.print(f"[yellow]Could not generate an LLM answer: {exc}[/yellow]")
@@ -127,9 +128,10 @@ class V2App:
             self.console.print(Panel(sources, title="Sources", border_style="green"))
 
     def _generate_and_run(self) -> None:
-        self.console.print("\n[bold]Generate and Run Simulation[/bold]")
+        self._section("Generate and Run Simulation")
 
-        prompt = input("Prompt (leave blank to reuse current prompt): ").strip()
+        self.console.print("[dim]Paste a new prompt, or press Enter to reuse the current prompt.[/dim]")
+        prompt = self._prompt()
         if prompt:
             self.state.current_prompt = prompt
 
@@ -137,7 +139,8 @@ class V2App:
             self.console.print("[yellow]No prompt set yet.[/yellow]")
             return
 
-        artifacts = self.generation.generate(self.state.current_prompt)
+        with self.console.status("[cyan]Generating script...[/cyan]", spinner="dots"):
+            artifacts = self.generation.generate(self.state.current_prompt)
         self.state.last_generation = artifacts
         self._render_artifacts(artifacts)
 
@@ -152,13 +155,15 @@ class V2App:
         self._clear_run_state()
         self.console.print(f"\n[green]Script saved to: {output_path}[/green]")
 
-        result = self.execution.run_script(output_path)
+        with self.console.status("[cyan]Running simulation...[/cyan]", spinner="dots"):
+            result = self.execution.run_script(output_path)
         self._record_execution(result)
         self._print_execution(result)
 
         if result.output_h5:
             try:
-                summary = self.diagnostics.summarize_output(result.output_h5)
+                with self.console.status("[cyan]Summarizing output...[/cyan]", spinner="dots"):
+                    summary = self.diagnostics.summarize_output(result.output_h5)
                 self.state.last_output_summary = summary
                 self.console.print(Panel(
                     self.diagnostics.format_summary(summary),
@@ -169,7 +174,7 @@ class V2App:
                 self.console.print(f"[yellow]Run finished, but output summary failed: {exc}[/yellow]")
 
     def _view_edit_script(self) -> None:
-        self.console.print("\n[bold]View/Edit Current Script[/bold]")
+        self._section("View/Edit Current Script")
 
         if self.state.current_script:
             self.console.print(
@@ -188,12 +193,15 @@ class V2App:
         else:
             self.console.print("[dim]No current script loaded.[/dim]")
 
-        self.console.print("Options: [l] Load from file, [p] Paste replacement, [b] Back", markup=False)
-        choice = input("Select option: ").strip().lower()
+        self.console.print("  [l] Load from file", markup=False)
+        self.console.print("  [p] Paste replacement", markup=False)
+        self.console.print("  [b] Back", markup=False)
+        choice = self._prompt().lower()
         if choice == "b" or not choice:
             return
         if choice == "l":
-            path_text = input("File path: ").strip()
+            self.console.print("[dim]Enter a file path.[/dim]")
+            path_text = self._prompt()
             if not path_text:
                 return
             path = self._normalize_user_path(path_text)
@@ -209,7 +217,7 @@ class V2App:
             self.console.print("[dim]Paste the new script below. End with a line containing only END.[/dim]")
             lines = []
             while True:
-                line = input()
+                line = input("> ")
                 if line == "END":
                     break
                 lines.append(line)
@@ -225,14 +233,15 @@ class V2App:
         self.console.print("[yellow]Invalid option.[/yellow]")
 
     def _results_and_diagnostics(self) -> None:
-        self.console.print("\n[bold]Results and Diagnostics[/bold]")
+        self._section("Results and Diagnostics")
         output_h5 = self._find_output_h5()
         if not output_h5:
             self.console.print("[yellow]No output .h5 file found yet.[/yellow]")
             return
 
         try:
-            summary = self.diagnostics.summarize_output(output_h5)
+            with self.console.status("[cyan]Reading output...[/cyan]", spinner="dots"):
+                summary = self.diagnostics.summarize_output(output_h5)
             self.state.last_output_h5 = output_h5
             self.state.last_output_summary = summary
             self.console.print(
@@ -250,7 +259,7 @@ class V2App:
             for key, label in DIAGNOSTICS_MENU:
                 self.console.print(f"  [{key}] {label}", markup=False)
             self.console.print("  [b] Back", markup=False)
-            choice = input("Select option: ").strip().lower()
+            choice = self._prompt().lower()
             if choice == "b" or not choice:
                 return
             if choice == "1":
@@ -295,14 +304,16 @@ class V2App:
             self.console.print(Panel(result.stderr.strip(), title="Run Errors", border_style="red"))
 
     def _visualize_output(self, output_h5: Path, summary: dict) -> None:
-        request = input("Visualization request (blank for a sensible default): ").strip()
+        self.console.print("[dim]Describe the plot you want, or press Enter for a sensible default.[/dim]")
+        request = self._prompt()
         try:
-            plot_path, spec = self.visualization.create_plot(
-                output_h5,
-                summary,
-                request=request,
-                script_text=self.state.current_script,
-            )
+            with self.console.status("[cyan]Building visualization...[/cyan]", spinner="dots"):
+                plot_path, spec = self.visualization.create_plot(
+                    output_h5,
+                    summary,
+                    request=request,
+                    script_text=self.state.current_script,
+                )
             self.state.last_visualization_path = plot_path
             spec_text = json.dumps(
                 {
@@ -320,15 +331,17 @@ class V2App:
             self.console.print(f"[yellow]Visualization failed: {exc}[/yellow]")
 
     def _analyze_output(self, summary: dict) -> None:
-        question = input("Diagnosis question (blank for a general analysis): ").strip()
+        self.console.print("[dim]Ask a diagnosis question, or press Enter for a general analysis.[/dim]")
+        question = self._prompt()
         try:
-            analysis = self.diagnostics.analyze_output(
-                summary,
-                script_text=self.state.current_script,
-                stdout=self.state.last_run_stdout,
-                stderr=self.state.last_run_stderr,
-                user_question=question,
-            )
+            with self.console.status("[cyan]Analyzing results...[/cyan]", spinner="dots"):
+                analysis = self.diagnostics.analyze_output(
+                    summary,
+                    script_text=self.state.current_script,
+                    stdout=self.state.last_run_stdout,
+                    stderr=self.state.last_run_stderr,
+                    user_question=question,
+                )
             self.console.print(Panel(analysis, title="Analysis / Diagnosis", border_style="cyan"))
         except Exception as exc:
             self.console.print(f"[yellow]Analysis failed: {exc}[/yellow]")
@@ -347,6 +360,15 @@ class V2App:
         if len(text) >= 2 and text[0] == text[-1] and text[0] in {"'", '"'}:
             text = text[1:-1]
         return Path(text).expanduser().resolve()
+
+    def _prompt(self) -> str:
+        return input("> ").strip()
+
+    def _section(self, title: str, subtitle: str | None = None) -> None:
+        self.console.print()
+        self.console.rule(f"[bold cyan]{title}[/bold cyan]")
+        if subtitle:
+            self.console.print(f"[dim]{subtitle}[/dim]")
 
     def _render_artifacts(self, artifacts: GenerationArtifacts) -> None:
         self.console.print(Panel(artifacts.mode or "unknown", title="Mode", border_style="cyan"))
