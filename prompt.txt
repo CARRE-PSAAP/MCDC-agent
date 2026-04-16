@@ -1,1 +1,6 @@
-Create a simple slab simulation with 3 materials of different absorption cross sections with vacuum boundaries on each side. Tally flux and net current across the middle surface. Use 1000 particles, 2 batches, and a source across the entire slab.
+Create a 2D eigenvalue problem for a heterogeneous 4x4 pin bundle using universe and lattice hierarchy. 
+Build several pin universes, including higher-reactivity fuel, lower-reactivity fuel, a burnable absorber pin, 
+and a coolant-hole pin, with cylindrical pin regions inside moderator. 
+Arrange them in a mixed 4x4 lattice with reflective boundaries on the outer assembly box. 
+Add an isotropic source covering the assembly, enable eigenmode, and tally flux on a 2D mesh aligned with the bundle plus global fission. 
+Use a small number of particles for testing.

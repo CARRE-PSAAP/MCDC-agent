@@ -6,6 +6,15 @@ import h5py
 from mcdc_agent.mcdc.tools.api_reference import APIReference
 from mcdc_agent.mcdc.utils import extract_code
 from mcdc_agent.v2.config import AppConfig
+from mcdc_agent.v2.diagnostics import (
+    extract_prompt_intent,
+    extract_script_model,
+    format_check_issues,
+    format_plan_comparison,
+    format_prompt_intent,
+    format_script_model,
+    run_script_checks_with_plan,
+)
 from mcdc_agent.v2.llm import load_llm
 
 
@@ -137,6 +146,36 @@ class DiagnosticsService:
             parts.append("Run stderr:\n```text\n" + stderr.strip() + "\n```")
         return "\n\n".join(parts)
 
+    def build_structured_report(
+        self,
+        summary: dict[str, Any],
+        *,
+        script_text: str = "",
+        stdout: str = "",
+        stderr: str = "",
+        original_prompt: str = "",
+        plan: dict[str, Any] | None = None,
+        geometry_plan: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        model = extract_script_model(script_text)
+        prompt_intent = extract_prompt_intent(original_prompt) if original_prompt.strip() else None
+        issues = run_script_checks_with_plan(
+            model,
+            output_summary=summary,
+            original_prompt=original_prompt,
+            plan=plan,
+            geometry_plan=geometry_plan,
+        )
+        return {
+            "model": model,
+            "prompt_intent": prompt_intent,
+            "issues": issues,
+            "prompt_text": format_prompt_intent(prompt_intent) if prompt_intent else "No original prompt is available.",
+            "model_text": format_script_model(model),
+            "issues_text": format_check_issues(issues),
+            "plan_text": format_plan_comparison(plan or {}, geometry_plan or {}),
+        }
+
     def analyze_output(
         self,
         summary: dict[str, Any],
@@ -145,6 +184,9 @@ class DiagnosticsService:
         stdout: str = "",
         stderr: str = "",
         user_question: str = "",
+        original_prompt: str = "",
+        plan: dict[str, Any] | None = None,
+        geometry_plan: dict[str, Any] | None = None,
     ) -> str:
         findings = self._deterministic_findings(
             summary,
@@ -155,6 +197,15 @@ class DiagnosticsService:
         findings_text = "\n".join(f"- {finding}" for finding in findings) if findings else "- No obvious deterministic issues detected."
         script_evidence = self._build_script_evidence(script_text)
         script_evidence_text = script_evidence or "No script evidence was available."
+        structured = self.build_structured_report(
+            summary,
+            script_text=script_text,
+            stdout=stdout,
+            stderr=stderr,
+            original_prompt=original_prompt,
+            plan=plan,
+            geometry_plan=geometry_plan,
+        )
 
         relevant_api = self.api_reference.get_relevant_sections(
             "\n".join(filter(None, [user_question, stderr, stdout, script_text[:2000]]))
@@ -175,9 +226,17 @@ class DiagnosticsService:
             "Use the script and API reference to identify likely issues in the setup.\n"
             "Separate confirmed findings from suspected issues.\n"
             "When there is a problem, refer explicitly to relevant script lines/snippets and the API context.\n"
+            "Use the structured script report to reason about hierarchy, lattices, sources, tallies, and settings.\n"
+            "Treat the original prompt as the primary description of what the script should recreate.\n"
+            "Use the plan only as secondary context because it may be imperfect.\n"
             "Be concise and practical.\n\n"
+            f"Original prompt:\n{original_prompt or 'Not available.'}\n\n"
             f"User question:\n{user_question or 'Does anything look wrong or noteworthy?'}\n\n"
             f"Deterministic findings:\n{findings_text}\n\n"
+            f"Prompt intent summary:\n{structured['prompt_text']}\n\n"
+            f"Generation plan summary:\n{structured['plan_text']}\n\n"
+            f"Structured script summary:\n{structured['model_text']}\n\n"
+            f"Structured script issues:\n{structured['issues_text']}\n\n"
             f"Relevant script evidence:\n{script_evidence_text}\n\n"
             f"Run/output context:\n{context}\n\n"
             f"Relevant API reference:\n{relevant_api}\n\n"
@@ -205,6 +264,8 @@ class DiagnosticsService:
         user_question: str = "",
         analysis_text: str = "",
         original_prompt: str = "",
+        plan: dict[str, Any] | None = None,
+        geometry_plan: dict[str, Any] | None = None,
     ) -> str:
         if not script_text.strip():
             raise ValueError("No current script is available to fix.")
@@ -223,6 +284,15 @@ class DiagnosticsService:
         )
         findings_text = "\n".join(f"- {finding}" for finding in findings) if findings else "- No obvious deterministic issues detected."
         script_evidence = self._build_script_evidence(script_text) or "No script evidence was available."
+        structured = self.build_structured_report(
+            summary,
+            script_text=script_text,
+            stdout=stdout,
+            stderr=stderr,
+            original_prompt=original_prompt,
+            plan=plan,
+            geometry_plan=geometry_plan,
+        )
         context = self.build_analysis_context(
             summary,
             script_text=script_text,
@@ -239,6 +309,10 @@ class DiagnosticsService:
             f"Original prompt:\n{original_prompt or 'Not available.'}\n\n"
             f"User request for diagnosis:\n{user_question or 'General analysis'}\n\n"
             f"Deterministic findings:\n{findings_text}\n\n"
+            f"Prompt intent summary:\n{structured['prompt_text']}\n\n"
+            f"Generation plan summary:\n{structured['plan_text']}\n\n"
+            f"Structured script summary:\n{structured['model_text']}\n\n"
+            f"Structured script issues:\n{structured['issues_text']}\n\n"
             f"Diagnosis:\n{analysis_text or 'No prior diagnosis text provided.'}\n\n"
             f"Relevant script evidence:\n{script_evidence}\n\n"
             f"Run/output context:\n{context}\n\n"

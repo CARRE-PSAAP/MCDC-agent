@@ -335,6 +335,9 @@ class V2App:
                     stdout=self.state.last_run_stdout,
                     stderr=self.state.last_run_stderr,
                     user_question=question,
+                    original_prompt=self.state.current_prompt,
+                    plan=self.state.last_generation.plan if self.state.last_generation else None,
+                    geometry_plan=self.state.last_generation.geometry_plan if self.state.last_generation else None,
                 )
             self.state.last_analysis = analysis
             self.console.print(Panel(analysis, title="Analysis / Diagnosis", border_style="cyan"))
@@ -419,6 +422,8 @@ class V2App:
                     user_question=question,
                     analysis_text=analysis,
                     original_prompt=self.state.current_prompt,
+                    plan=self.state.last_generation.plan if self.state.last_generation else None,
+                    geometry_plan=self.state.last_generation.geometry_plan if self.state.last_generation else None,
                 )
         except Exception as exc:
             self.console.print(f"[yellow]Fix generation failed: {exc}[/yellow]")
