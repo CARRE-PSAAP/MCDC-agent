@@ -302,24 +302,26 @@ class V2App:
         request = self._prompt()
         try:
             with self.console.status("[cyan]Building visualization...[/cyan]", spinner="dots"):
-                plot_path, spec = self.visualization.create_plot(
+                plot_path, program = self.visualization.create_plot(
                     output_h5,
                     summary,
                     request=request,
                     script_text=self.state.current_script,
                 )
             self.state.last_visualization_path = plot_path
-            spec_text = json.dumps(
-                {
-                    "kind": spec.kind,
-                    "tally": spec.tally,
-                    "score": spec.score,
-                    "value": spec.value,
-                    "title": spec.title,
-                },
-                indent=2,
+            self.console.print(
+                Panel(
+                    Syntax(
+                        program.code,
+                        "python",
+                        theme="monokai",
+                        line_numbers=True,
+                        word_wrap=True,
+                    ),
+                    title="Visualization Code",
+                    border_style="magenta",
+                )
             )
-            self.console.print(Panel(spec_text, title="Visualization Spec", border_style="magenta"))
             self.console.print(f"[green]Saved plot to: {plot_path}[/green]")
         except Exception as exc:
             self.console.print(f"[yellow]Visualization failed: {exc}[/yellow]")
