@@ -233,9 +233,7 @@ class VisualizationService:
 
     @staticmethod
     def _default_plot_path(output_h5: Path, program: VisualizationProgram) -> Path:
-        request_part = re.sub(r"[^a-zA-Z0-9_]+", "_", program.request.lower()).strip("_")
-        request_part = request_part[:60] if request_part else "visualization"
-        return output_h5.with_name(f"{output_h5.stem}_{request_part}.png")
+        return output_h5.with_name("visualization.png")
 
     @staticmethod
     def _extract_value_array(score_group: h5py.Group, value_kind: str):

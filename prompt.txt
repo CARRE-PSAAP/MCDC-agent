@@ -1,6 +1,7 @@
-Create a 2D eigenvalue problem for a heterogeneous 4x4 pin bundle using universe and lattice hierarchy. 
-Build several pin universes using continuous materials, including higher-reactivity fuel, lower-reactivity fuel, a burnable absorber pin, 
-and a coolant-hole pin, with cylindrical pin regions inside moderator. 
-Arrange them in a mixed 4x4 lattice with reflective boundaries on the outer assembly box. 
-Add an isotropic source covering the assembly, enable eigenmode, and tally flux on a fine 2D mesh aligned with the bundle plus global fission. 
-Use a moderate number of particles and 6 total batches.
+Create a 2D eigenvalue problem for a heterogeneous 5x5 pin bundle using universe and lattice hierarchy. 
+Build several pin universes using continuous materials, including higher-reactivity fuel, a burnable absorber pin, 
+and a moderator pin, with cylindrical pin regions inside moderator. 
+Arrange the 5x5 lattice to create a cross: place high-reactivity fuel pins to create a cross, 
+use absorber pins to create the center pin, 
+and place moderator pins everywhere else. Add an isotropic source covering the assembly, enable eigenmode, 
+and tally flux and fission on a fine 2D mesh aligned with the bundle. Use a moderate number of particles and 6 total batches.
