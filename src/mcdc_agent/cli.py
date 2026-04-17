@@ -241,22 +241,22 @@ def main():
     """Main CLI entry point."""
     parser = argparse.ArgumentParser(
         prog="mcdc-agent",
-        description="Generate MCDC Monte Carlo simulation scripts using AI",
+        description="Generate and analyze MCDC Monte Carlo simulation scripts using the v2 AI agent",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   mcdc-agent generate "[Simulation description]"
   mcdc-agent generate --file prompt.txt -o my_script.py
-  mcdc-agent generate "..." --provider ollama --model qwen3:8b
+  mcdc-agent generate --provider openrouter --model anthropic/claude-opus-4.6 --file prompt.txt
+  mcdc-agent generate --backend legacy --provider gemini --model gemini-3-flash-preview --file prompt.txt
   mcdc-agent generate --backend direct --provider openrouter --model anthropic/claude-opus-4.6 --file prompt.txt
-  mcdc-agent generate --backend v2 --provider openrouter --model anthropic/claude-opus-4.6 --file prompt.txt
   mcdc-agent interactive
 
 Environment Variables:
-  LLM_PROVIDER    Set to 'ollama' or 'gemini' (default: gemini)
-  OLLAMA_MODEL    Default model for Ollama (default: qwen3:8b)
-  GEMINI_API_KEY  Required for Gemini provider
-  OPENROUTER_API_KEY  Required for OpenRouter direct generation
+  OPENROUTER_API_KEY  Required for the default v2 and direct generation flows
+  OPENROUTER_MODEL    Optional default model override for v2/direct
+  GEMINI_API_KEY      Required only when explicitly using --backend legacy --provider gemini
+  OLLAMA_MODEL        Required only when explicitly using --backend legacy --provider ollama
 """
     )
     
@@ -288,17 +288,17 @@ Environment Variables:
         help="Output filename (default: mcdc_input.py)"
     )
     gen_parser.add_argument(
-        "--backend", type=str, default="legacy",
+        "--backend", type=str, default="v2",
         choices=["legacy", "direct", "v2"],
-        help="Generation backend: existing LangChain agent flow, direct generator, or the new v2 pipeline"
+        help="Generation backend (default: v2): v2 pipeline, direct generator, or the legacy LangChain agent flow"
     )
     gen_parser.add_argument(
         "--provider", type=str, default=None,
-        help="LLM provider: legacy supports 'gemini'/'ollama'; direct and v2 use 'openrouter'"
+        help="LLM provider: v2/direct use 'openrouter'; legacy supports 'gemini'/'ollama'"
     )
     gen_parser.add_argument(
         "--model", type=str, default=None,
-        help="Model name (e.g., 'qwen3:8b', 'gemini-3-flash-preview')"
+        help="Model name (e.g., 'anthropic/claude-opus-4.6', 'google/gemini-3-flash-preview', 'qwen3:8b')"
     )
     gen_parser.add_argument(
         "--dry-run", action="store_true",
@@ -328,7 +328,7 @@ Environment Variables:
     )
     gen_parser.add_argument(
         "--trace-dir", type=str, default=None,
-        help="Direct backend only: save prompt, plans, phase outputs, and final script to this directory"
+        help="Direct/v2: save prompt, plans, phase outputs, and final script to this directory; v2 writes artifacts incrementally"
     )
     gen_parser.add_argument(
         "--show-trace", action="store_true",
@@ -346,13 +346,13 @@ Environment Variables:
         help="Start interactive onboarding mode"
     )
     int_parser.add_argument(
-        "--backend", type=str, default="legacy",
+        "--backend", type=str, default="v2",
         choices=["legacy", "v2"],
-        help="Interactive backend: legacy LangChain onboarding or the new v2 flow"
+        help="Interactive backend (default: v2): the v2 flow or the legacy LangChain onboarding flow"
     )
     int_parser.add_argument(
         "--provider", type=str, default=None,
-        help="LLM provider: legacy supports 'gemini'/'ollama'; v2 supports 'openrouter'"
+        help="LLM provider: v2 uses 'openrouter'; legacy supports 'gemini'/'ollama'"
     )
     int_parser.add_argument(
         "--model", type=str, default=None,
@@ -379,6 +379,10 @@ Environment Variables:
     int_parser.add_argument(
         "--max-fix-attempts", type=int, default=3,
         help="v2 only: maximum automatic fix attempts"
+    )
+    int_parser.add_argument(
+        "--trace-dir", type=str, default=None,
+        help="v2 only: save prompt, plans, phase outputs, and final script to this directory as they are generated"
     )
     int_parser.add_argument(
         "-v", "--verbose", action="store_true",

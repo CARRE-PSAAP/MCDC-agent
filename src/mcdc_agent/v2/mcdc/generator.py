@@ -30,6 +30,7 @@ class MCDCGeneratorV2:
                 max_fix_attempts=self.config.max_fix_attempts,
                 generation_mode=mode,
                 context_method=self.config.context_method,
+                artifact_output_dir=self.config.trace_dir,
             )
         return self.generators[mode]
 

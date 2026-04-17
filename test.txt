@@ -1,0 +1,25 @@
+Create a 2D reactor core eigenvalue problem using a three-level hierarchy.
+
+Level 1 - Pin Cells:
+Define pin cell universes with cylindrical geometry:
+- Fuel pin
+- Guide tube pin
+- Moderator-only pin
+
+Level 2 - Assemblies:
+Create two 7×7 assembly lattices:
+- A fuel assembly with guide tubes in a simple symmetric pattern
+- A second fuel assembly with a different guide tube pattern
+Also create one all-moderator assembly for outer regions.
+
+Wrap each assembly lattice in its own universe.
+
+Level 3 - Core:
+Create a 3×3 core lattice using these assembly universes, use the fuel assemblies to form a cross shape in the core.
+Use vacuum boundaries on all sides.
+Center the core lattice correctly.
+
+Enable eigenvalue mode with 6 total batches.
+Add a source over the central fuel assembly.
+Tally mesh flux and fission over the full core, use a fine mesh.
+Use a small particle count for testing.

@@ -14,6 +14,7 @@ class GeneratorConfig:
     generation_mode: str = "auto"
     max_fix_attempts: int = 0
     temperature: float = 0.1
+    trace_dir: Path | None = None
 
 
 @dataclass(slots=True)

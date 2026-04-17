@@ -1,10 +1,9 @@
 # MCDC Agent
 
 > This agent is in testing. Generated scripts may require manual review.
-> Please let Gunnar on slack know if you have any issues
+> Please let Gunnar on slack know if you have any issues.
 
-An AI agent that guides you through building [MC/DC](https://github.com/CEMeNT-PSAAP/MCDC) neutron transport simulations. Uses Google Gemini to help you generate simulation input scripts. Currently does not support the various MCDC techniques like `population_control`, `branchless_collision()`, etc., they will be added in the future.
-
+An AI agent for building [MC/DC](https://github.com/CEMeNT-PSAAP/MCDC) neutron transport simulations. The default experience now uses the v2 pipeline, which provides OpenRouter-backed script generation, interactive learning/Q&A, execution, diagnostics, and visualization.
 
 ## Setup
 
@@ -29,17 +28,34 @@ pip install "git+https://github.com/CARRE-PSAAP/MCDC-agent.git"
    pip install .
    ```
 
-### 2. Configure Gemini API
-You need a Google Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey).
+### 2. Configure OpenRouter
+
+The default v2 experience uses OpenRouter.
+
+```bash
+export OPENROUTER_API_KEY="your-api-key-here"
+```
+
+Optionally set a default model:
+
+```bash
+export OPENROUTER_MODEL="google/gemini-3-flash-preview"
+```
+
+### 3. Legacy Providers (Optional)
+
+The legacy backend is still available explicitly with `--backend legacy`.
+
+For Gemini:
 
 ```bash
 export GEMINI_API_KEY="your-api-key-here"
 ```
 
-If you encounter rate limits, you can set up billing (it will cost a few cents) or switch models by setting the `GEMINI_MODEL` environment variable:
+For Ollama:
 
 ```bash
-export GEMINI_MODEL="gemini-2.5-flash"  # or "gemini-2-flash"
+export OLLAMA_MODEL="qwen3:14b"
 ```
 
 ## Usage
@@ -47,19 +63,25 @@ export GEMINI_MODEL="gemini-2.5-flash"  # or "gemini-2-flash"
 The agent provides a CLI command `mcdc-agent`.
 
 ### Interactive Mode
-Best for beginners. The agent guides you step-by-step.
+
+The default interactive experience uses the v2 app:
 
 ```bash
 mcdc-agent interactive
 ```
 
-### Input Script Generation (Recommended)
-Generate a script directly from a prompt.
+### Input Script Generation
+
+Generate a script directly from a prompt with the default v2 backend:
 
 ```bash
 mcdc-agent generate "[Simulation description]"
 ```
 
-### Options
-- `mcdc-agent generate --file prompt.txt -o run.py`: Read from file and save output.
-- `mcdc-agent --help`: Show all available commands.
+### Common Commands
+
+- `mcdc-agent generate --file prompt.txt -o run.py`
+- `mcdc-agent generate --provider openrouter --model anthropic/claude-opus-4.6 --file prompt.txt`
+- `mcdc-agent interactive --file prompt.txt`
+- `mcdc-agent generate --backend legacy --provider gemini --file prompt.txt`
+- `mcdc-agent --help`

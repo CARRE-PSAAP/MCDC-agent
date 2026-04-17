@@ -41,6 +41,7 @@ class AppConfig:
     max_fix_attempts: int = 3
     temperature: float = 0.1
     output_path: Path = field(default_factory=lambda: Path("mcdc_input.py"))
+    trace_dir: Path | None = None
 
     def generator_config(self) -> GeneratorConfig:
         return GeneratorConfig(
@@ -50,4 +51,5 @@ class AppConfig:
             generation_mode=self.generation_mode,
             max_fix_attempts=self.max_fix_attempts,
             temperature=self.temperature,
+            trace_dir=self.trace_dir,
         )

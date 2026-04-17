@@ -87,6 +87,7 @@ class SmallModelGenerator:
         validation_timeout: float = 15.0,
         generation_mode: str = "phased",
         context_method: str = "api_examples_plan_geom",
+        artifact_output_dir: Path | None = None,
     ):
         self.llm = llm
         self.max_fix_attempts = max_fix_attempts
@@ -97,6 +98,7 @@ class SmallModelGenerator:
         self.api_reference = APIReference()
         self.validator = DryRunValidator(timeout=validation_timeout)
         self.examples_registry = self._discover_examples()
+        self.artifact_output_dir = Path(artifact_output_dir).resolve() if artifact_output_dir else None
 
         # Tracking (public, for plan-only mode)
         self.last_raw_response: str = ""
@@ -149,10 +151,12 @@ class SmallModelGenerator:
         self.last_geometry_plan = {}
         self.last_phase_scripts = {}
         self.last_script = ""
+        self._reset_trace_artifacts(prompt)
 
         # 1. Classify complexity
         mode = self._detect_complexity(prompt)
         self.last_mode = mode
+        self._write_trace_summary()
         print(f"[Generator] Mode: {mode}")
 
         # 2. Generate general plan (JSON)
@@ -160,12 +164,18 @@ class SmallModelGenerator:
         if plan_only or self._should_include("plan") or self._should_include("geometry_plan"):
             plan = self._plan(prompt, mode)
         self.last_plan = plan
+        if self.last_plan:
+            self._write_trace_json("general_plan.json", self.last_plan)
+            self._write_trace_summary()
 
         # 3. Generate geometry plan (JSON, complex only)
         geometry_plan = {}
         if mode == "complex" and (plan_only or self._should_include("geometry_plan")):
             geometry_plan = self._plan_geometry(prompt, plan)
             self.last_geometry_plan = geometry_plan
+            if self.last_geometry_plan:
+                self._write_trace_json("geometry_plan.json", self.last_geometry_plan)
+                self._write_trace_summary()
 
         if plan_only:
             return None
@@ -175,6 +185,8 @@ class SmallModelGenerator:
             print("[Generator] Full-script generation")
             script = self._generate_full_script(prompt, plan, geometry_plan, mode)
             self.last_phase_scripts["full"] = script
+            self._write_trace_text("full.py", script)
+            self._write_trace_summary()
         else:
             # Phased generation (default)
             script = ""
@@ -182,12 +194,71 @@ class SmallModelGenerator:
                 print(f"[Generator] Phase: {phase}")
                 script = self._run_phase(phase, prompt, plan, geometry_plan, script, mode)
                 self.last_phase_scripts[phase] = script
+                self._write_trace_text(f"{phase}.py", script)
+                self._write_trace_summary()
 
         # 5. Dry-run validation + fix loop
         script = self._final_validation(prompt, plan, geometry_plan, script, mode)
         self.last_script = script
+        self._write_trace_text("final_script.py", script)
+        self._write_trace_summary()
 
         return script
+
+    def _reset_trace_artifacts(self, prompt: str) -> None:
+        trace_dir = self._ensure_trace_dir()
+        if trace_dir is None:
+            return
+
+        for filename in [
+            "prompt.txt",
+            "general_plan.json",
+            "geometry_plan.json",
+            "setup.py",
+            "geometry.py",
+            "finalize.py",
+            "full.py",
+            "final_script.py",
+            "trace_summary.json",
+        ]:
+            path = trace_dir / filename
+            if path.exists():
+                path.unlink()
+
+        self._write_trace_text("prompt.txt", prompt)
+        self._write_trace_summary()
+
+    def _ensure_trace_dir(self) -> Path | None:
+        if self.artifact_output_dir is None:
+            return None
+        self.artifact_output_dir.mkdir(parents=True, exist_ok=True)
+        return self.artifact_output_dir
+
+    def _write_trace_text(self, filename: str, content: str) -> None:
+        trace_dir = self._ensure_trace_dir()
+        if trace_dir is None:
+            return
+        (trace_dir / filename).write_text(content, encoding="utf-8")
+
+    def _write_trace_json(self, filename: str, payload: Dict) -> None:
+        trace_dir = self._ensure_trace_dir()
+        if trace_dir is None:
+            return
+        (trace_dir / filename).write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+    def _write_trace_summary(self) -> None:
+        trace_dir = self._ensure_trace_dir()
+        if trace_dir is None:
+            return
+
+        summary = {
+            "mode": self.last_mode,
+            "phases": list(self.last_phase_scripts),
+            "has_plan": bool(self.last_plan),
+            "has_geometry_plan": bool(self.last_geometry_plan),
+            "has_final_script": bool(self.last_script),
+        }
+        (trace_dir / "trace_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
 
     @staticmethod
     def _normalize_generation_mode(generation_mode: str) -> str:

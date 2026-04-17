@@ -20,6 +20,7 @@ def _build_config(args) -> AppConfig:
         max_fix_attempts=getattr(args, "max_fix_attempts", 3),
         temperature=0.1,
         output_path=Path(args.output),
+        trace_dir=Path(args.trace_dir) if getattr(args, "trace_dir", None) else None,
     )
 
 
@@ -75,7 +76,10 @@ def run_generate(args, prompt: str, console: Console) -> None:
     if args.no_validate:
         console.print("[yellow]The v2 backend currently always performs final validation; ignoring --no-validate[/yellow]")
 
-    service = GenerationService(_build_config(args))
+    config = _build_config(args)
+    service = GenerationService(config)
+    if config.trace_dir:
+        console.print(f"[dim]Saving v2 trace artifacts to: {config.trace_dir}[/dim]")
     status_text = "[cyan]Planning...[/cyan]" if (args.plan_only or args.dry_run) else "[cyan]Generating script...[/cyan]"
     with console.status(status_text, spinner="dots"):
         artifacts = service.plan(prompt) if (args.plan_only or args.dry_run) else service.generate(prompt)
@@ -89,7 +93,10 @@ def run_generate(args, prompt: str, console: Console) -> None:
 
 
 def run_interactive(args, console: Console) -> None:
-    app = V2App(_build_config(args), console=console)
+    config = _build_config(args)
+    if config.trace_dir:
+        console.print(f"[dim]Saving v2 trace artifacts to: {config.trace_dir}[/dim]")
+    app = V2App(config, console=console)
     if getattr(args, "file", None):
         app.load_prompt_file(args.file)
         console.print(f"[dim]Loaded prompt from: {args.file}[/dim]")
