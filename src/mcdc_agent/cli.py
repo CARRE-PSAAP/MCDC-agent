@@ -14,8 +14,6 @@ def setup_logging(verbose: bool = False):
     )
     # Suppress noisy dependencies
     logging.getLogger("httpx").setLevel(logging.WARNING)
-    logging.getLogger("sentence_transformers").setLevel(logging.WARNING)
-    logging.getLogger("chromadb").setLevel(logging.WARNING)
 
 
 def _load_prompt_text(args, console):
@@ -138,46 +136,6 @@ def _cmd_generate_v2(args, prompt, console):
     run_generate(args, prompt, console)
 
 
-def _cmd_generate_legacy(args, prompt, console):
-    """Run the existing decomposer + interactive agent generation backend."""
-    # Import here to avoid slow startup for --help
-    from mcdc_agent.utils import load_llm
-    from mcdc_agent.onboarding.agent import MCDCAgent
-    from mcdc_agent.onboarding.decomposer import Decomposer
-
-    # Initialize LLM with provided or default settings
-    llm = load_llm(
-        temperature=0.1,
-        model=args.model,
-        provider=args.provider
-    )
-
-    agent = MCDCAgent(llm)
-    decomposer = Decomposer(llm)
-
-    # Decompose prompt into steps
-    tasks = decomposer.decompose(prompt)
-    console.print(f"[cyan]Decomposed into {len(tasks)} steps[/cyan]")
-
-    if args.dry_run:
-        for i, task in enumerate(tasks, 1):
-            console.print(f"  {i}. [{task.step.upper()}] {task.instruction}")
-        console.print("\n[yellow]Dry run - no execution[/yellow]")
-        return
-
-    # Execute batch
-    result = agent.execute_batch(
-        [t.to_dict() for t in tasks],
-        enable_validation=not args.no_validate,
-        verbose=args.verbose
-    )
-
-    # Save result
-    output_path = Path(args.output)
-    output_path.write_text(result)
-    console.print(f"\n[green]Script saved to: {args.output}[/green]")
-
-
 def cmd_generate(args):
     """Handle the 'generate' subcommand."""
     from rich.console import Console
@@ -190,10 +148,8 @@ def cmd_generate(args):
     try:
         if args.backend == "direct":
             _cmd_generate_direct(args, prompt, console)
-        elif args.backend == "v2":
-            _cmd_generate_v2(args, prompt, console)
         else:
-            _cmd_generate_legacy(args, prompt, console)
+            _cmd_generate_v2(args, prompt, console)
         
     except Exception as e:
         console.print(f"[red]Error: {e}[/red]")
@@ -210,22 +166,9 @@ def cmd_interactive(args):
     console = Console()
     
     try:
-        if args.backend == "v2":
-            from mcdc_agent.v2.cli import run_interactive
+        from mcdc_agent.v2.cli import run_interactive
 
-            run_interactive(args, console)
-            return
-
-        from mcdc_agent.utils import load_llm
-        from mcdc_agent.onboarding.agent import MCDCAgent
-
-        llm = load_llm(
-            temperature=0.1,
-            model=args.model,
-            provider=args.provider
-        )
-        agent = MCDCAgent(llm)
-        agent.run_onboarding()
+        run_interactive(args, console)
         
     except KeyboardInterrupt:
         console.print("\n[yellow]Exiting.[/yellow]")
@@ -248,15 +191,12 @@ Examples:
   mcdc-agent generate "[Simulation description]"
   mcdc-agent generate --file prompt.txt -o my_script.py
   mcdc-agent generate --provider openrouter --model anthropic/claude-opus-4.6 --file prompt.txt
-  mcdc-agent generate --backend legacy --provider gemini --model gemini-3-flash-preview --file prompt.txt
   mcdc-agent generate --backend direct --provider openrouter --model anthropic/claude-opus-4.6 --file prompt.txt
   mcdc-agent interactive
 
 Environment Variables:
   OPENROUTER_API_KEY  Required for the default v2 and direct generation flows
   OPENROUTER_MODEL    Optional default model override for v2/direct
-  GEMINI_API_KEY      Required only when explicitly using --backend legacy --provider gemini
-  OLLAMA_MODEL        Required only when explicitly using --backend legacy --provider ollama
 """
     )
     
@@ -289,12 +229,12 @@ Environment Variables:
     )
     gen_parser.add_argument(
         "--backend", type=str, default="v2",
-        choices=["legacy", "direct", "v2"],
-        help="Generation backend (default: v2): v2 pipeline, direct generator, or the legacy LangChain agent flow"
+        choices=["direct", "v2"],
+        help="Generation backend (default: v2): v2 pipeline or the direct generator"
     )
     gen_parser.add_argument(
         "--provider", type=str, default=None,
-        help="LLM provider: v2/direct use 'openrouter'; legacy supports 'gemini'/'ollama'"
+        help="LLM provider for v2/direct (default: openrouter)"
     )
     gen_parser.add_argument(
         "--model", type=str, default=None,
@@ -343,16 +283,11 @@ Environment Variables:
     # --- Interactive subcommand ---
     int_parser = subparsers.add_parser(
         "interactive", aliases=["int", "i"],
-        help="Start interactive onboarding mode"
-    )
-    int_parser.add_argument(
-        "--backend", type=str, default="v2",
-        choices=["legacy", "v2"],
-        help="Interactive backend (default: v2): the v2 flow or the legacy LangChain onboarding flow"
+        help="Start the interactive v2 mode"
     )
     int_parser.add_argument(
         "--provider", type=str, default=None,
-        help="LLM provider: v2 uses 'openrouter'; legacy supports 'gemini'/'ollama'"
+        help="LLM provider for the v2 interactive flow (default: openrouter)"
     )
     int_parser.add_argument(
         "--model", type=str, default=None,

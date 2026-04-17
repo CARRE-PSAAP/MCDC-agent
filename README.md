@@ -30,7 +30,7 @@ pip install "git+https://github.com/CARRE-PSAAP/MCDC-agent.git"
 
 ### 2. Configure OpenRouter
 
-The default v2 experience uses OpenRouter.
+The current agent experience uses OpenRouter.
 
 ```bash
 export OPENROUTER_API_KEY="your-api-key-here"
@@ -40,22 +40,6 @@ Optionally set a default model:
 
 ```bash
 export OPENROUTER_MODEL="google/gemini-3-flash-preview"
-```
-
-### 3. Legacy Providers (Optional)
-
-The legacy backend is still available explicitly with `--backend legacy`.
-
-For Gemini:
-
-```bash
-export GEMINI_API_KEY="your-api-key-here"
-```
-
-For Ollama:
-
-```bash
-export OLLAMA_MODEL="qwen3:14b"
 ```
 
 ## Usage
@@ -82,6 +66,6 @@ mcdc-agent generate "[Simulation description]"
 
 - `mcdc-agent generate --file prompt.txt -o run.py`
 - `mcdc-agent generate --provider openrouter --model anthropic/claude-opus-4.6 --file prompt.txt`
+- `mcdc-agent generate --backend direct --provider openrouter --model anthropic/claude-opus-4.6 --file prompt.txt`
 - `mcdc-agent interactive --file prompt.txt`
-- `mcdc-agent generate --backend legacy --provider gemini --file prompt.txt`
 - `mcdc-agent --help`

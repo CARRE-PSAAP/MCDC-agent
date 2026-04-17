@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-from mcdc_agent.onboarding.concepts import CONCEPT_LESSONS
 from mcdc_agent.v2.config import AppConfig
+from mcdc_agent.v2.lessons import CONCEPT_LESSONS
 from mcdc_agent.v2.llm import load_llm
 
 
@@ -125,9 +125,8 @@ class QAService:
             )
 
         chunk_specs = [
-            ("docs", base / "onboarding" / "mcdc_api_reference.md"),
             ("docs", base / "mcdc" / "tools" / "mcdc_api_reference.md"),
-            ("docs", base / "onboarding" / "concepts.py"),
+            ("docs", base / "v2" / "lessons.py"),
         ]
         for category, path in chunk_specs:
             if path.exists():
@@ -147,11 +146,11 @@ class QAService:
             base / "mcdc" / "generators" / "small_model_generator.py",
             base / "mcdc" / "generators" / "small_model_prompts.py",
             base / "mcdc" / "tools" / "validator.py",
-            base / "onboarding" / "plot_generator.py",
             base / "v2" / "services" / "generation.py",
             base / "v2" / "services" / "execution.py",
             base / "v2" / "services" / "diagnostics.py",
             base / "v2" / "services" / "onboarding.py",
+            base / "v2" / "services" / "visualization.py",
         ]
         for path in code_files:
             if path.exists():

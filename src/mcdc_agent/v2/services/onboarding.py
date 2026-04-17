@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 
-from mcdc_agent.onboarding.concepts import CONCEPT_LESSONS
 from mcdc_agent.v2.config import LEARN_MENU
+from mcdc_agent.v2.lessons import CONCEPT_LESSONS
 
 
 @dataclass(frozen=True, slots=True)

@@ -21,7 +21,7 @@ class MaterialCatalog:
         material_properties_path: Path | None = None,
         nuclear_data_path: Path | None = None,
     ):
-        base = Path(__file__).resolve().parents[2] / "onboarding"
+        base = Path(__file__).resolve().parent
         self.material_properties_path = material_properties_path or base / "material_properties.csv"
         self.nuclear_data_path = nuclear_data_path or base / "nuclear_data.csv"
         self.materials = self._load_csv(self.material_properties_path)

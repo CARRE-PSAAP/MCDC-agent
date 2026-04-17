@@ -1,3 +1,5 @@
+"""Structured lesson content used by the v2 onboarding and QA services."""
+
 CONCEPT_LESSONS = {
     "material": {
         "concept": (
